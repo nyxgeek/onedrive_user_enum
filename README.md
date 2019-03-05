@@ -25,4 +25,4 @@ Beginning enumeration of acmecomputercompany.com ...
 >
 ```
 
-###Note: Users that are valid but who have not yet signed into OneDrive will return a 404 not found.
+### Note: Users that are valid but who have not yet signed into OneDrive will return a 404 not found.
