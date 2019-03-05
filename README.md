@@ -17,24 +17,28 @@ The results may vary depending on how widely used OneDrive is within an org. It 
 Python:
 
 ```
-> python onedrive_enum.py -U users.txt -t acmecomputercompany.com
-Setting target to acmecomputercompany.com
-Domain is: acmecomputercompany
-Extension is: com
+> python onedrive_enum.py -U users.txt -d acmecomputercompany.com
+
++-----------------------------------------+
+|           OneDrive Enumerator           |
+|       2019 @nyxgeek - TrustedSec        |
++-----------------------------------------+
+
 Reading users from file: users.txt
-Beginning enumeration of acmecomputercompany.com ...
-[-] [404] not found fakeuser
-[-] [404] not found fake.user
-[-] [404] not found westb
-[+] [403] VALID ONEDRIVE FOR westa
-[-] [404] not found westc
-[+] [403] VALID ONEDRIVE FOR lightmand
-[-] [404] not found admin
-[-] [404] not found crabapplee
-[+] [403] VALID ONEDRIVE FOR johns
-[-] [404] not found venturej
-[-] [404] not found stevens
-[-] [404] not found stevenf
+Connection to https://acmecomputercompany-my.sharepoint.com was successful...
+Beginning enumeration of https://acmecomputercompany-my.sharepoint.com/personal/USER_acmecomputercompany_com/
+[-] [404] not found acmecomputercompany.com - fakeuser
+[-] [404] not found acmecomputercompany.com - fake.user
+[-] [404] not found acmecomputercompany.com - westb
+[+] [403] VALID ONEDRIVE FOR acmecomputercompany.com - westa
+[-] [404] not found acmecomputercompany.com - westc
+[+] [403] VALID ONEDRIVE FOR acmecomputercompany.com - lightmand
+[-] [404] not found acmecomputercompany.com - admin
+[-] [404] not found acmecomputercompany.com - crabapplee
+[+] [403] VALID ONEDRIVE FOR acmecomputercompany.com - johns
+[-] [404] not found acmecomputercompany.com - venturej
+[-] [404] not found acmecomputercompany.com - stevens
+[-] [404] not found acmecomputercompany.com - stevenf
 >
 ```
 
