@@ -1,6 +1,17 @@
 # onedrive_user_enum
 enumerate valid onedrive users
 
+
+## overview
+OneDrive users have a file share URL with a known location:
+
+https://acmecomputercompany-my.sharepoint.com/personal/lightmand_acmecomputercompany_com/_layouts/15/onedrive.aspx
+
+In this instance, the username is 'lightmand' and the domain is 'acmecomputercompany.com'. If a user has logged into OneDrive, this path will exist and return a 403 status code. If they have not, or the user is invalid, it will return a 404.
+
+The results may vary depending on how widely used OneDrive is within an org. It will often have less coverage than a full user-enum brute force attack via a tool like office365userenum (https://bitbucket.org/grimhacker/office365userenum), but it does not attempt a login and is much more passive, and undetectable to the target org. Microsoft will see the hits, but they won't.
+
+
 ## usage
 
 Python:
