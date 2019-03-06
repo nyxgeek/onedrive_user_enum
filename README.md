@@ -2,7 +2,7 @@
 enumerate valid onedrive users
 
 
-## overview
+## overview:
 OneDrive users have a file share URL with a known location:
 
 https://acmecomputercompany-my.sharepoint.com/personal/lightmand_acmecomputercompany_com/_layouts/15/onedrive.aspx
@@ -12,10 +12,20 @@ In this instance, the username is 'lightmand' and the domain is 'acmecomputercom
 The results may vary depending on how widely used OneDrive is within an org. It will often have less coverage than a full user-enum brute force attack via a tool like office365userenum (https://bitbucket.org/grimhacker/office365userenum), but it does not attempt a login and is much more passive, and undetectable to the target org. Microsoft will see the hits, but the target org won't.
 
 
-## usage
+## usage:
 
-Python:
+```
+Flags:
+    -d    target domain
+    -t    tenant (optional: try running without specifying this flag first)
+    -u    username to test
+    -U    file containing usernames to test
+    -o    output file (default: onedrive_enum.log)
+    -v    verbose mode
 
+```
+
+## example:
 ```
 > python onedrive_enum.py -U users.txt -d acmecomputercompany.com
 
@@ -39,33 +49,6 @@ Beginning enumeration of https://acmecomputercompany-my.sharepoint.com/personal/
 [-] [404] not found acmecomputercompany.com - venturej
 [-] [404] not found acmecomputercompany.com - stevens
 [-] [404] not found acmecomputercompany.com - stevenf
->
-```
-
-Bash:
-```
-> ./onedrive_enum.sh acmecomputercompany.com users.txt
-+-----------------------------------------+
-|           OneDrive Enumerator           |
-|       2019 @nyxgeek - TrustedSec        |
-+-----------------------------------------+
-
-Determine whether a user has OneDrive set up. Useful as backup method for enumeration.
-Checks for existence of following-style path:
-https://acmecomputercompany-my.sharepoint.com/personal/lightmand_acmecomputercompany_com/_layouts/15/onedrive.aspx
-
-[-] [404] NOT FOUND  fakeuser
-[-] [404] NOT FOUND  fake.user
-[-] [404] NOT FOUND  westb
-[+] [403] ONEDRIVE EXISTS FOR  westa
-[-] [404] NOT FOUND  westc
-[+] [403] ONEDRIVE EXISTS FOR  lightmand
-[-] [404] NOT FOUND  admin
-[-] [404] NOT FOUND  crabapplee
-[+] [403] ONEDRIVE EXISTS FOR  johns
-[-] [404] NOT FOUND  venturej
-[-] [404] NOT FOUND  stevens
-[-] [404] NOT FOUND  stevenf
 >
 ```
 
