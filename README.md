@@ -15,6 +15,8 @@ The results may vary depending on how widely used OneDrive is within an org. It 
 ## usage:
 
 ```
+python onedrive_enum.py -U users.txt -d acmecomputercompany.com
+
 Flags:
     -d    target domain
     -t    tenant (optional: try running without specifying this flag first)
