@@ -1,3 +1,6 @@
+**NOTE: When originally released, this tool was the only "passive" method of user enum (not requiring login attempt). However, recently released "UhOh365" is now a better option for most people https://github.com/Raikia/UhOh365**
+
+
 # onedrive_user_enum
 enumerate valid onedrive users
 
