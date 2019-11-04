@@ -28,6 +28,56 @@ verbose = False
 isUser = False
 isUserFile = False
 outputfilename = "onedrive_enum.log"
+
+
+# read arguments from the command line
+args = parser.parse_args()
+
+if args.domain:
+    #print("Setting target to %s" % args.domain)
+    targetdomainarray = (args.domain.split('.'))
+    targetdomain=targetdomainarray[0]
+
+    # set tenantname here by default
+    tenantname = targetdomain
+    if verbose:
+        print("Domain is: %s" % targetdomain)
+    targetsections=len(targetdomainarray)
+    targetextension = (targetdomainarray[(targetsections-1)])
+    if verbose:
+        print("Extension is: %s" % targetextension )
+
+if args.tenant:
+    # if a tenant is specified, overwrite the default domain one
+    print("Setting tenant as: %s" % args.tenant)
+    tenantname = args.tenant
+
+if args.output:
+    outputfilename = args.output
+
+if args.verbose:
+    verbose = True
+
+if args.username:
+    print("Checking username: %s" % args.username)
+    username = args.username
+    #checkUser()
+    isUser = True
+
+if args.userfile:
+    print("Reading users from file: %s" % args.userfile)
+    global userfile
+    userfile = args.userfile
+    #checkUserFile()
+    global isUserfile
+    isUserFile = True
+
+
+
+
+
+
+
 print("\n+-----------------------------------------+")
 print("|           OneDrive Enumerator           |")
 print("|       2019 @nyxgeek - TrustedSec        |")
@@ -121,56 +171,6 @@ def testConnect():
         print("Could not reach %s" % url)
         quit()
 
-
-# read arguments from the command line
-args = parser.parse_args()
-
-if args.domain:
-    #print("Setting target to %s" % args.domain)
-    targetdomainarray = (args.domain.split('.'))
-    global targetdomain
-    targetdomain=targetdomainarray[0]
-
-    # set tenantname here by default
-    global tenantname
-    tenantname = targetdomain
-    if verbose:
-        print("Domain is: %s" % targetdomain)
-    targetsections=len(targetdomainarray)
-    global targetextension
-    targetextension = (targetdomainarray[(targetsections-1)])
-    if verbose:
-        print("Extension is: %s" % targetextension )
-
-if args.tenant:
-    # if a tenant is specified, overwrite the default domain one
-    print("Setting tenant as: %s" % args.tenant)
-    global tenantname
-    tenantname = args.tenant
-
-if args.output:
-    global outputfilename
-    outputfilename = args.output
-
-if args.verbose:
-    global verbose
-    verbose = True
-
-if args.username:
-    print("Checking username: %s" % args.username)
-    global username
-    username = args.username
-    #checkUser()
-    global isUser
-    isUser = True
-
-if args.userfile:
-    print("Reading users from file: %s" % args.userfile)
-    global userfile
-    userfile = args.userfile
-    #checkUserFile()
-    global isUserfile
-    isUserFile = True
 
 
 testConnect()
