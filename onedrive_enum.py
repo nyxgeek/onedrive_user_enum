@@ -16,7 +16,7 @@ import argparse
 
 # initiate the parser
 parser = argparse.ArgumentParser()
-parser.add_argument("-d", "--domain", help="target domain name")
+parser.add_argument("-d", "--domain", help="target domain name", required=True)
 parser.add_argument("-t", "--tenant", help="tenant name (default: based off domain name)")
 parser.add_argument("-u", "--username", help="user to target")
 parser.add_argument("-U", "--userfile", help="file containing users to target")
@@ -128,13 +128,16 @@ args = parser.parse_args()
 if args.domain:
     #print("Setting target to %s" % args.domain)
     targetdomainarray = (args.domain.split('.'))
+    global targetdomain
     targetdomain=targetdomainarray[0]
 
     # set tenantname here by default
+    global tenantname
     tenantname = targetdomain
     if verbose:
         print("Domain is: %s" % targetdomain)
     targetsections=len(targetdomainarray)
+    global targetextension
     targetextension = (targetdomainarray[(targetsections-1)])
     if verbose:
         print("Extension is: %s" % targetextension )
@@ -142,24 +145,31 @@ if args.domain:
 if args.tenant:
     # if a tenant is specified, overwrite the default domain one
     print("Setting tenant as: %s" % args.tenant)
+    global tenantname
     tenantname = args.tenant
 
 if args.output:
+    global outputfilename
     outputfilename = args.output
 
 if args.verbose:
+    global verbose
     verbose = True
 
 if args.username:
     print("Checking username: %s" % args.username)
+    global username
     username = args.username
     #checkUser()
+    global isUser
     isUser = True
 
 if args.userfile:
     print("Reading users from file: %s" % args.userfile)
+    global userfile
     userfile = args.userfile
     #checkUserFile()
+    global isUserfile
     isUserFile = True
 
 
