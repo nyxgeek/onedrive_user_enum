@@ -53,6 +53,7 @@ if args.tenant:
     tenantname = args.tenant
 
 if args.output:
+    global outputfilename
     outputfilename = args.output
 
 if args.verbose:
@@ -60,7 +61,7 @@ if args.verbose:
 
 if args.username:
     print("Checking username: %s" % args.username)
-    username = args.username
+    username = args.username.replace(".","_")
     #checkUser()
     isUser = True
 
@@ -94,7 +95,7 @@ def checkUserFile():
 
         f = open(userfile)
         for userline in f:
-            username = userline.rstrip()
+            username = (userline.rstrip()).replace(".","_")
 
             url = 'https://' + tenantname + '-my.sharepoint.com/personal/' + username + '_' + targetdomain + '_' + targetextension + '/_layouts/15/onedrive.aspx'
             if verbose:
@@ -170,7 +171,5 @@ def testConnect():
     else:
         print("Could not reach %s" % url)
         quit()
-
-
 
 testConnect()
