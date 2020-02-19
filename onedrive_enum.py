@@ -126,8 +126,8 @@ def checkUserFile():
             else:
                 RESPONSE = "[?] [" + str(r.status_code) + "] UNKNOWN RESPONSE"
 
-            print("%s %s.%s - %s" % (RESPONSE,targetdomain,targetextension,username))
-            of.write("%s %s.%s - %s\n" % (RESPONSE,targetdomain,targetextension,username))
+            print("%s %s.%s - %s, username:%s@%s.%s" % (RESPONSE,targetdomain,targetextension,username, username.replace("_","."),targetdomain,targetextension))
+            of.write("%s %s.%s - %s, username:%s@%s.%s\n" % (RESPONSE,targetdomain,targetextension,username, username.replace("_","."),targetdomain,targetextension))
 
         f.close()
     of.close()
