@@ -53,7 +53,6 @@ if args.tenant:
     tenantname = args.tenant
 
 if args.output:
-    global outputfilename
     outputfilename = args.output
 
 if args.verbose:
