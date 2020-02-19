@@ -95,7 +95,16 @@ def checkUserFile():
 
         f = open(userfile)
         for userline in f:
+
+
+
             username = (userline.rstrip()).replace(".","_")
+
+            if ( "@" in username ):
+                if verbose:
+                    print("Email address format detected, converting to username format")
+                username = username.split("@")[0]
+
 
             url = 'https://' + tenantname + '-my.sharepoint.com/personal/' + username + '_' + targetdomain + '_' + targetextension + '/_layouts/15/onedrive.aspx'
             if verbose:
