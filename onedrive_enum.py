@@ -129,6 +129,8 @@ def checkUserFile():
                 continue
             if r.status_code == 403:
                 RESPONSE = "[+] [403] VALID ONEDRIVE FOR"
+            elif r.status_code == 401:
+                RESPONSE = "[+] [401] VALID ONEDRIVE FOR"
             elif r.status_code == 404:
                 RESPONSE = "[-] [404] not found"
             else:
@@ -136,7 +138,7 @@ def checkUserFile():
 
             print("%s %s.%s - %s, username:%s@%s.%s" % (RESPONSE,targetdomain,targetextension,username, username.replace("_","."),targetdomain,targetextension))
             of.write("%s %s.%s - %s, username:%s@%s.%s\n" % (RESPONSE,targetdomain,targetextension,username, username.replace("_","."),targetdomain,targetextension))
-
+            of.flush()
         f.close()
     of.close()
 
@@ -149,6 +151,8 @@ def checkUser():
 
     if r.status_code == 403:
         RESPONSE = "[+] [403] VALID ONEDRIVE FOR"
+    elif r.status_code == 401:
+        RESPONSE = "[+] [401] VALID ONEDRIVE FOR"
     elif r.status_code == 404:
         RESPONSE = "[-] [404] not found"
     else:
