@@ -148,10 +148,9 @@ def checkUserFile():
     for userline in f:
 
         while int(threading.activeCount()) >= int(thread_count):
-            #print "We have enough threads, sleeping."
-            time.sleep(1)
+            # We have enough threads, sleeping.
+            time.sleep(3)
 
-        #print "Spawing thread for: " + userline + " thread(" + str(threading.activeCount()) +")"
         x = threading.Thread(target=checkURL, args=(userline,))
         x.start()
         listthread.append(x)
