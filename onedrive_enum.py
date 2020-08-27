@@ -10,6 +10,8 @@ from requests.exceptions import ConnectionError, ReadTimeout, Timeout
 import datetime
 import os
 import time
+import threading
+
 
 # include standard modules
 import argparse
@@ -22,6 +24,7 @@ parser.add_argument("-u", "--username", help="user to target")
 parser.add_argument("-U", "--userfile", help="file containing users to target")
 parser.add_argument("-o", "--output", help="file to write output to (default: onedrive_enum.log)")
 parser.add_argument("-v", "--verbose", help="enable verbose output", action='store_true')
+parser.add_argument("-T", "--threads", help="total number of threads (defaut: 10)")
 
 username = "FakeUser"
 verbose = False
@@ -58,6 +61,11 @@ if args.output:
 if args.verbose:
     verbose = True
 
+if args.threads:
+    thread_count = args.threads
+else:
+    thread_count = 10
+
 if args.username:
     print("Checking username: %s" % args.username)
     username = args.username.replace(".","_")
@@ -83,64 +91,75 @@ print("|           OneDrive Enumerator           |")
 print("|       2019 @nyxgeek - TrustedSec        |")
 print("+-----------------------------------------+\n")
 
+def checkURL(userline):
+    of = open((os.path.abspath(outputfilename)),"a")
+    username = (userline.rstrip()).replace(".","_")
+
+    if ( "@" in username ):
+        if verbose:
+            print("Email address format detected, converting to username format")
+        username = username.split("@")[0]
+
+
+    url = 'https://' + tenantname + '-my.sharepoint.com/personal/' + username + '_' + targetdomain + '_' + targetextension + '/_layouts/15/onedrive.aspx'
+    if verbose:
+        print("Url is: %s" % url)
+
+    requests.packages.urllib3.disable_warnings()
+
+    try:
+        r = requests.head(url, timeout=2.0)
+    except requests.ConnectionError as e:
+        if verbose:
+            print e
+
+        print("Encountered connection error. Let's sleep on it.")
+        time.sleep(3)
+    except requests.Timeout as e:
+        print("Read Timeout reached, sleeping for 3 seconds")
+        time.sleep(3)
+    except requests.RequestException as e:
+        print("Request Exception - weird. Gonna sleep for 3")
+        time.sleep(3)
+    if r.status_code == 403:
+        RESPONSE = "[+] [403] VALID ONEDRIVE FOR"
+    elif r.status_code == 401:
+        RESPONSE = "[+] [401] VALID ONEDRIVE FOR"
+    elif r.status_code == 404:
+        RESPONSE = "[-] [404] not found"
+    else:
+        RESPONSE = "[?] [" + str(r.status_code) + "] UNKNOWN RESPONSE"
+
+    print("%s %s.%s - %s, username:%s@%s.%s" % (RESPONSE,targetdomain,targetextension,username, username.replace("_","."),targetdomain,targetextension))
+    of.write("%s %s.%s - %s, username:%s@%s.%s\n" % (RESPONSE,targetdomain,targetextension,username, username.replace("_","."),targetdomain,targetextension))
+    of.flush()
+    of.close()
+
 
 def checkUserFile():
     print("Beginning enumeration of https://%s-my.sharepoint.com/personal/USER_%s_%s/" % (tenantname,targetdomain,targetextension))
-    with open((os.path.abspath(outputfilename)),"a") as of:
-        currenttime=datetime.datetime.now()
-        of.write("Started enumerating onedrive at {0}\n".format(currenttime))
-
-
-
-        f = open(userfile)
-        for userline in f:
-
-
-
-            username = (userline.rstrip()).replace(".","_")
-
-            if ( "@" in username ):
-                if verbose:
-                    print("Email address format detected, converting to username format")
-                username = username.split("@")[0]
-
-
-            url = 'https://' + tenantname + '-my.sharepoint.com/personal/' + username + '_' + targetdomain + '_' + targetextension + '/_layouts/15/onedrive.aspx'
-            if verbose:
-                print("Url is: %s" % url)
-
-            requests.packages.urllib3.disable_warnings()
-
-            try:
-                r = requests.head(url, timeout=2.0)
-            except requests.ConnectionError as e:
-                if verbose:
-                    print e
-
-                print("Encountered connection error. Let's sleep on it.")
-                time.sleep(3)
-                continue
-            except requests.Timeout as e:
-                print("Read Timeout reached, sleeping for 3 seconds")
-                time.sleep(3)
-            except requests.RequestException as e:
-                print("Request Exception - weird. Gonna sleep for 3")
-                time.sleep(3)
-                continue
-            if r.status_code == 403:
-                RESPONSE = "[+] [403] VALID ONEDRIVE FOR"
-            elif r.status_code == 401:
-                RESPONSE = "[+] [401] VALID ONEDRIVE FOR"
-            elif r.status_code == 404:
-                RESPONSE = "[-] [404] not found"
-            else:
-                RESPONSE = "[?] [" + str(r.status_code) + "] UNKNOWN RESPONSE"
-
-            print("%s %s.%s - %s, username:%s@%s.%s" % (RESPONSE,targetdomain,targetextension,username, username.replace("_","."),targetdomain,targetextension))
-            of.write("%s %s.%s - %s, username:%s@%s.%s\n" % (RESPONSE,targetdomain,targetextension,username, username.replace("_","."),targetdomain,targetextension))
-            of.flush()
-        f.close()
+    of = open((os.path.abspath(outputfilename)),"a")
+    currenttime=datetime.datetime.now()        
+    of.write("Started enumerating onedrive at {0}\n".format(currenttime))
     of.close()
+
+    f = open(userfile)
+    listthread=[]
+    for userline in f:
+
+        while int(threading.activeCount()) >= int(thread_count):
+            # We have enough threads, sleeping.
+            time.sleep(3)
+
+        x = threading.Thread(target=checkURL, args=(userline,))
+        x.start()
+        listthread.append(x)
+
+    f.close()
+    
+    for i in listthread:
+    	i.join()
+    return
 
 
 def checkUser():
@@ -170,7 +189,7 @@ def testConnect():
     except requests.ConnectionError as e:
         if verbose:
             print e
-        print("Tenant does not exist - please specify tenant with -T option")
+        print("Tenant does not exist - please specify tenant with -t option")
         quit()
 
 

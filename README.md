@@ -20,11 +20,12 @@ python onedrive_enum.py -U users.txt -d acmecomputercompany.com
 
 Flags:
     -d    target domain
-    -t    tenant (optional: try running without specifying this flag first)
+    -T    tenant (optional: try running without specifying this flag first)
     -u    username to test
     -U    file containing usernames to test
     -o    output file (default: onedrive_enum.log)
     -v    verbose mode
+    -t    threads (default: 10)
 
 ```
 
