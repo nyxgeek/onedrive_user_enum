@@ -3,7 +3,8 @@
 # 2019 @nyxgeek - TrustedSec
 # checks for return code from:
 # https://acmecomputercompany-my.sharepoint.com/personal/lightmand_acmecomputercompany_com/_layouts/15/onedrive.aspx
-
+#
+# Thanks to @jarsnah12 and @initroott for contributions!
 
 import requests
 from requests.exceptions import ConnectionError, ReadTimeout, Timeout
@@ -11,10 +12,16 @@ import datetime
 import os
 import time
 import threading
-
+from threading import Semaphore
+import logging
+#from retrying import retry
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.util.retry import Retry
 
 # include standard modules
 import argparse
+
+writeLock = Semaphore(value = 1)
 
 # initiate the parser
 parser = argparse.ArgumentParser()
@@ -22,7 +29,7 @@ parser.add_argument("-d", "--domain", help="target domain name", required=True)
 parser.add_argument("-t", "--tenant", help="tenant name (default: based off domain name)")
 parser.add_argument("-u", "--username", help="user to target")
 parser.add_argument("-U", "--userfile", help="file containing users to target")
-parser.add_argument("-o", "--output", help="file to write output to (default: onedrive_enum.log)")
+parser.add_argument("-o", "--output", help="file to write output to (default: output.log)")
 parser.add_argument("-v", "--verbose", help="enable verbose output", action='store_true')
 parser.add_argument("-T", "--threads", help="total number of threads (defaut: 10)")
 
@@ -30,7 +37,7 @@ username = "FakeUser"
 verbose = False
 isUser = False
 isUserFile = False
-outputfilename = "onedrive_enum.log"
+outputfilename = "output.log"
 
 
 # read arguments from the command line
@@ -46,7 +53,13 @@ if args.domain:
     if verbose:
         print("Domain is: %s" % targetdomain)
     targetsections=len(targetdomainarray)
-    targetextension = (targetdomainarray[(targetsections-1)])
+    if targetsections > 2:
+        targetextension = (targetdomainarray[(targetsections-2)]+"_"+targetdomainarray[(targetsections-1)])
+        #print("Extension is: %s" % targetextension )
+    else:
+        targetextension = (targetdomainarray[(targetsections-1)])
+        #print("Extension is: %s" % targetextension )
+
     if verbose:
         print("Extension is: %s" % targetextension )
 
@@ -60,11 +73,6 @@ if args.output:
 
 if args.verbose:
     verbose = True
-
-if args.threads:
-    thread_count = args.threads
-else:
-    thread_count = 10
 
 if args.username:
     print("Checking username: %s" % args.username)
@@ -80,8 +88,32 @@ if args.userfile:
     global isUserfile
     isUserFile = True
 
+if args.threads:
+    thread_count = args.threads
+else:
+    thread_count = 10
 
 
+
+
+def requests_retry_session(
+    retries=3,
+    backoff_factor=0.3,
+    status_forcelist=(500, 502, 504),
+    session=None,
+):
+    session = session or requests.Session()
+    retry = Retry(
+        total=retries,
+        read=retries,
+        connect=retries,
+        backoff_factor=backoff_factor,
+        status_forcelist=status_forcelist,
+    )
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount('http://', adapter)
+    session.mount('https://', adapter)
+    return session
 
 
 
@@ -91,10 +123,10 @@ print("|           OneDrive Enumerator           |")
 print("|       2019 @nyxgeek - TrustedSec        |")
 print("+-----------------------------------------+\n")
 
+#@retry
 def checkURL(userline):
-    of = open((os.path.abspath(outputfilename)),"a")
+    #global r
     username = (userline.rstrip()).replace(".","_")
-
     if ( "@" in username ):
         if verbose:
             print("Email address format detected, converting to username format")
@@ -103,24 +135,40 @@ def checkURL(userline):
 
     url = 'https://' + tenantname + '-my.sharepoint.com/personal/' + username + '_' + targetdomain + '_' + targetextension + '/_layouts/15/onedrive.aspx'
     if verbose:
+        writeLock.acquire()
         print("Url is: %s" % url)
+        writeLock.release()
 
     requests.packages.urllib3.disable_warnings()
 
     try:
-        r = requests.head(url, timeout=2.0)
+        r = requests_retry_session().head(url, timeout=2.0)
     except requests.ConnectionError as e:
         if verbose:
-            print e
+            print("Error: %s" % e)
 
         print("Encountered connection error. Let's sleep on it.")
         time.sleep(3)
+        checkURL(userline)
+        #continue
     except requests.Timeout as e:
+        if verbose:
+            print("Error: %s" % e)
         print("Read Timeout reached, sleeping for 3 seconds")
         time.sleep(3)
+        checkURL(userline)
     except requests.RequestException as e:
+        if verbose:
+            print("Error: %s" % e)
         print("Request Exception - weird. Gonna sleep for 3")
         time.sleep(3)
+        checkURL(userline)
+        #continue
+    except:
+        print("Well, I'm not sure what just happened. Onward we go...")
+        time.sleep(3)
+        checkURL(userline)
+
     if r.status_code == 403:
         RESPONSE = "[+] [403] VALID ONEDRIVE FOR"
     elif r.status_code == 401:
@@ -130,35 +178,46 @@ def checkURL(userline):
     else:
         RESPONSE = "[?] [" + str(r.status_code) + "] UNKNOWN RESPONSE"
 
+    writeLock.acquire()
     print("%s %s.%s - %s, username:%s@%s.%s" % (RESPONSE,targetdomain,targetextension,username, username.replace("_","."),targetdomain,targetextension))
+    writeLock.release()
     of.write("%s %s.%s - %s, username:%s@%s.%s\n" % (RESPONSE,targetdomain,targetextension,username, username.replace("_","."),targetdomain,targetextension))
-    of.flush()
-    of.close()
 
+    of.flush()
+
+#def doNothing(userline):
+#  logging.info("Doing nothing with: " + userline)
+#  time.sleep(10)
 
 def checkUserFile():
+
+    format = "%(asctime)s: %(message)s"
+    logging.basicConfig(format=format, level=logging.INFO, datefmt="%H:%M:%S")
+
     print("Beginning enumeration of https://%s-my.sharepoint.com/personal/USER_%s_%s/" % (tenantname,targetdomain,targetextension))
-    of = open((os.path.abspath(outputfilename)),"a")
-    currenttime=datetime.datetime.now()        
+    currenttime=datetime.datetime.now()
+
     of.write("Started enumerating onedrive at {0}\n".format(currenttime))
-    of.close()
+    of.flush()
 
     f = open(userfile)
     listthread=[]
     for userline in f:
-
+        #if threading.activeCount() < thread_count:
         while int(threading.activeCount()) >= int(thread_count):
-            # We have enough threads, sleeping.
-            time.sleep(3)
+            #print "We have enough threads, sleeping."
+            time.sleep(1)
 
+        #print "Spawing thread for: " + userline + " thread(" + str(threading.activeCount()) +")"
         x = threading.Thread(target=checkURL, args=(userline,))
-        x.start()
+
         listthread.append(x)
+        x.start()
 
     f.close()
-    
+
     for i in listthread:
-    	i.join()
+        i.join()
     return
 
 
@@ -166,7 +225,7 @@ def checkUser():
     url = 'https://' + tenantname + '-my.sharepoint.com/personal/' + username + '_' + targetdomain + '_' + targetextension + '/_layouts/15/onedrive.aspx'
     print("Url is: %s" % url)
 
-    r = requests.get(url)
+    r = requests_retry_session().get(url)
 
     if r.status_code == 403:
         RESPONSE = "[+] [403] VALID ONEDRIVE FOR"
@@ -185,11 +244,11 @@ def testConnect():
     requests.packages.urllib3.disable_warnings()
 
     try:
-        r = requests.head(url, timeout=1.0)
+        r = requests_retry_session().head(url, timeout=1.0)
     except requests.ConnectionError as e:
         if verbose:
-            print e
-        print("Tenant does not exist - please specify tenant with -t option")
+            print("%s" % e)
+        print("Tenant does not exist - please specify tenant with -T option")
         quit()
 
 
@@ -203,4 +262,7 @@ def testConnect():
         print("Could not reach %s" % url)
         quit()
 
+
+of = open((os.path.abspath(outputfilename)),"a")
 testConnect()
+of.close()
