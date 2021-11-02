@@ -178,10 +178,12 @@ def checkURL(userline):
     else:
         RESPONSE = "[?] [" + str(r.status_code) + "] UNKNOWN RESPONSE"
 
+    domain_rebuilt = targetdomain.replace("_",".") + "." + targetextension.replace("_",".")
+
     writeLock.acquire()
-    print("%s %s.%s - %s, username:%s@%s.%s" % (RESPONSE,targetdomain,targetextension,username, username.replace("_","."),targetdomain,targetextension))
+    print("%s %s - %s, username:%s@%s" % (RESPONSE,domain_rebuilt,username, username.replace("_","."),domain_rebuilt))
     writeLock.release()
-    of.write("%s %s.%s - %s, username:%s@%s.%s\n" % (RESPONSE,targetdomain,targetextension,username, username.replace("_","."),targetdomain,targetextension))
+    of.write("%s %s - %s, username:%s@%s\n" % (RESPONSE,domain_rebuilt,username, username.replace("_","."),domain_rebuilt))
 
     of.flush()
 
