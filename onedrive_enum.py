@@ -250,7 +250,7 @@ def testConnect():
     except requests.ConnectionError as e:
         if verbose:
             print("%s" % e)
-        print("Tenant does not exist - please specify tenant with -T option")
+        print("Tenant does not exist - please specify tenant with --tenant or -t option")
         quit()
 
 
