@@ -206,7 +206,7 @@ def checkUserFile():
     listthread=[]
     for userline in f:
         #if threading.activeCount() < thread_count:
-        while int(threading.activeCount()) >= int(thread_count):
+        while int(threading.active_count()) >= int(thread_count):
             #print "We have enough threads, sleeping."
             time.sleep(1)
 
