@@ -631,14 +631,15 @@ def export_sql_users(domain):
             getUsersQuery = f"SELECT email_address FROM onedrive_enum WHERE domain = '{domain}';"
             #print(getUsersQuery)
             result = conn.execute(getUsersQuery)
-            resultcount = len(result.fetchall())
+            export_results = result.fetchall()
+            resultcount = len(export_results)
             conn.commit()
             #print(result.fetchall())
             now = datetime.now()
             formatted_date = now.strftime("%Y%m%d")
             output_filename = f'emails_{domain}_{formatted_date}.txt'
             with open(output_filename, 'w') as f:  # 'w' means write mode which overwrites existing contents
-                for user in result:
+                for user in export_results:
                     f.write(user[0] + '\n')  # write each email on a new line
             conn.close()
             print(f"{resultcount} emails have been written to {output_filename}")
