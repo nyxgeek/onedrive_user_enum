@@ -108,4 +108,9 @@ Beginning enumeration of https://microsoft-my.sharepoint.com/personal/USER_micro
 
 ```
 
-### Note: Users that are valid but who have not yet signed into OneDrive will return a 404 not found.
+#### Note: Users that are valid but who have not yet signed into OneDrive will return a 404 not found.
+
+
+## sHoUtOuTz aNd GrEeTz
+
+Thanks to @DrAzureAD, @thetechr0mancer, @rootsecdev, @hacking_lz
