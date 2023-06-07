@@ -137,7 +137,6 @@ class UrlChecker:
                     
         except sqlite3.Error as er:
             print("Some SQLite error in sql_check_for_previous_runs! Maybe write some better logging next time.")
-            print("Some SQLite error in sql_check_tried_usernames! Maybe write some better logging next time.")
             print('SQLite error: %s' % (' '.join(er.args)))
             print("Exception class is: ", er.__class__)
             print('SQLite traceback: ')
@@ -151,12 +150,13 @@ class UrlChecker:
             print("Checking our tried users.")
         try:
             conn = sqlite3.connect(sqldb_location)
-            checkLogsQuery = f"SELECT userlist FROM onedrive_log WHERE domain = '{self.domain}' AND tenant = '{self.tenant}' AND environment = '{self.environment}' AND append = '{self.appendString}' AND end_date_unix IS NOT NULL AND end_date_unix != '1337000004';"
+            checkLogsQuery = f"SELECT userlist FROM onedrive_log WHERE domain = '{self.domain}' AND tenant = '{self.tenant_name}' AND environment = '{self.environment}' AND append = '{self.appendString}' AND end_date_unix IS NOT NULL AND end_date_unix != '1337000004';"
             if verbose:
                 print(checkLogsQuery)
             cursor = conn.execute(checkLogsQuery)
+            result = cursor.fetchall()
             #conn.close()
-            return cursor
+            return result
         except sqlite3.Error as er:
             print("Some SQLite error in sql_check_tried_usernames! Maybe write some better logging next time.")
             print('SQLite error: %s' % (' '.join(er.args)))
@@ -211,7 +211,7 @@ class UrlChecker:
 
         if enable_db:
             if verbose:
-                print("Logging current run")
+                print("Logging current run as complete")
             try:
                 conn = sqlite3.connect(sqldb_location)
                 logCompletedLogsQuery = f"UPDATE onedrive_log SET end_date_unix = {end_unix_time}, found = {self.validcount}, errors = {self.errorcount} WHERE  domain = '{self.domain}' AND userlist = '{userlist}' AND tenant = '{self.tenant_name}' AND start_date_unix = '{self.start_unix_time}';"
@@ -365,7 +365,8 @@ class UrlChecker:
 
         if self.skip_tried:
             print("Dedupe enabled... Starting dedupe:")
-            self.checkTriedUsernames(self.userdata, self.tenant_name, self.domain)
+            self.checkTriedUsernames(self.userdata)
+            #self.checkTriedUsernames(self.userdata, self.tenant_name, self.domain)
         else:
             originalCount = subprocess.run(['wc', '-l', self.userdata], capture_output=True, text=True)
             self.totalcount = int((originalCount.stdout).split()[0])
@@ -443,13 +444,13 @@ class UrlChecker:
             return False
 
     def checkTriedUsernames(self, userlist):
-        result = self.sql_check_tried_usernames(userlist)
-        print("We have tried:")
-        print(result)
 
         tmp_tried_users = "/tmp/onedrive_enum.tried.users"
         tmp_incoming_users = "/tmp/onedrive_enum.unknown.users"
         tmp_untried_users = "/tmp/onedrive_enum.untried.users"
+
+
+
         if verbose:
             print("Sorting our incoming list...")
         os.system(f'cat {userlist} | sort -u  > {tmp_incoming_users}')
@@ -462,25 +463,42 @@ class UrlChecker:
             print("Incoming file is empty. Exiting.")
             self.status = "1337000003"
             if enable_db:
-                self.sql_log_completed_run(userlist)
+                self.sql_log_completed_run(self.userdata)
             exit()
+        else:
+            if verbose:
+                print(f"Count is {oCountText}")
 
-        concat_wordlists = ""
-        for wordlist in result:
-            wordlist = wordlist[0]
-            if wordlist not in concat_wordlists:
-                concat_wordlists += wordlist+ " "
+        #concat_wordlists = ""
+        #for wordlist in result:
+        #    wordlist = wordlist[0]
+        #    if wordlist not in concat_wordlists:
+        #        concat_wordlists += wordlist+ " "
 
-        print("Done compiling runs")
+        #print("Done compiling runs")
 
-        if len(concat_wordlists) == 0:
+
+
+        result = self.sql_check_tried_usernames()
+        # we need this to be in a format where 'cat' can read it in, space separated values -- 'USERFILES/test1.txt USERFILES/test2.txt'
+        list_of_files = ""
+
+        for tmpfile in result:
+            if debug:
+                print(tmpfile[0])
+            list_of_files += f"{tmpfile[0]} "
+
+        if debug:
+            print(list_of_files)
+
+
+        if len(list_of_files) == 0:
             print("This is our first run. No need to de-dupe.")
-            #global totalcount
             self.totalcount = oCountText
             return
 
         print("Creating a list of all usernames that have ever been attempted with this tenant/domain. This might take a minute... or 5. ")
-        os.system(f'cat {concat_wordlists} | sort -u  > {tmp_tried_users}')
+        os.system(f'cat {list_of_files} | sort -u  > {tmp_tried_users}')
         if verbose:
             print("List complete.")
 
@@ -489,14 +507,15 @@ class UrlChecker:
         newCount = subprocess.run(['wc', '-l', tmp_untried_users], capture_output=True, text=True)
         nCountText = int((newCount.stdout).split()[0])
 
-        if verbose:
-            print(f'We have reduced the count from {oCountText} to {nCountText}')
+        #if verbose:
+        print(f'We have reduced the count from {oCountText} to {nCountText}')
 
         if nCountText == 0:
             print("We have reduced our count to zero due to previous runs. Marking this wordlist as done!")
             status = "1337000003"
             if enable_db:
-                self.logCompleteCurrentRunNew(userlist, self.tenant_name, self.domain, status)
+                #self.logCompleteCurrentRunNew(userlist, self.tenant_name, self.domain, status)
+                self.sql_log_completed_run(self.userdata)
             of = open((os.path.abspath(outputfilename)),"a")
             of.write("NO_NEW\n")
             of.close()
@@ -631,6 +650,7 @@ def export_sql_users(domain):
             getUsersQuery = f"SELECT email_address FROM onedrive_enum WHERE domain = '{domain}';"
             #print(getUsersQuery)
             result = conn.execute(getUsersQuery)
+            #resultcount = len(result.fetchall())
             export_results = result.fetchall()
             resultcount = len(export_results)
             conn.commit()
@@ -813,7 +833,8 @@ def main():
                 try:
                     url_checker = UrlChecker(tenantname, target_domain, environment, endpoint, userdata, appendString, skip_tried)
                     url_checker.check_user_file()
-                except:
+                except Exception as userfileerror:
+                    print(userfileerror)
                     if verbose:
                         print("Whoops something happened there with a userfile")
                     pass
