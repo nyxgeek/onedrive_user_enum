@@ -113,4 +113,4 @@ Beginning enumeration of https://microsoft-my.sharepoint.com/personal/USER_micro
 
 ## sHoUtOuTz aNd GrEeTz
 
-Thanks to @DrAzureAD, @thetechr0mancer, @rootsecdev, @hacking_lz
+Thanks to @DrAzureAD, @thetechr0mancer, @rootsecdev, @HackingLZ
