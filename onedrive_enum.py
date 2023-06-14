@@ -89,10 +89,13 @@ print("*************************************************************************
 
 class UrlChecker:
     """Check URLs and handle associated operations."""
-    def __init__(self, tenant_name, domain, environment, endpoint, userdata, appendString, skip_tried):
+    def __init__(self, tenant_name, domain, environment, endpoint, userdata, appendString, skip_tried,safe_domain):
         self.tenant_name = tenant_name.rstrip().lower()
         self.domain = domain.rstrip().lower()
-        self.safe_domain = self.domain.replace(".", "_")
+        if safe_domain is None:
+            self.safe_domain = self.domain.replace(".", "_")
+        else:
+            self.safe_domain = safe_domain
         self.environment = environment
         self.endpoint = endpoint
         self.userdata = userdata
@@ -699,6 +702,7 @@ def main():
     parser.add_argument("-k", "--killafter", help="kill off non-productive jobs after x tries with no success", metavar='')
     parser.add_argument("-v", "--verbose", help="enable verbose output", action='store_true', default=False)
     parser.add_argument("-D", "--debug", help="enable debug output", action='store_true', default=False)
+    parser.add_argument("-sd", "--safe-domain", help="setup a specific safe_domain for the check ", metavar='')
 
     # read arguments from the command line
     args = parser.parse_args()
@@ -722,6 +726,13 @@ def main():
             print("Domain is: %s" % target_domain)
     else:
         target_domain = None
+
+    if args.safe_domain:
+        safe_domain = args.safe_domain
+    else:
+        safe_domain = target_domain
+    if verbose:
+        print("Safe Domain is: %s" % safe_domain)
 
     if args.tenant:
         tenantname = (args.tenant).lower()
@@ -750,6 +761,7 @@ def main():
         playlist = args.playlist
         isPlaylist = True
 
+    
     outputfilename = args.output
     if verbose:
         print("Output file: {}".format(outputfilename))
@@ -815,7 +827,7 @@ def main():
             print("We are checking on a username")
         userdata = username
         try:
-            url_checker = UrlChecker(tenantname, target_domain, environment, endpoint, userdata, appendString, skip_tried)
+            url_checker = UrlChecker(tenantname, target_domain, environment, endpoint, userdata, appendString, skip_tried,safe_domain)
             url_checker.check_user()
         except:
             if verbose:
@@ -831,7 +843,7 @@ def main():
         if os.path.exists(userfile):    #first see if it exists
             if os.path.isfile(userfile):    #then see if it's a file
                 try:
-                    url_checker = UrlChecker(tenantname, target_domain, environment, endpoint, userdata, appendString, skip_tried)
+                    url_checker = UrlChecker(tenantname, target_domain, environment, endpoint, userdata, appendString, skip_tried,safe_domain)
                     url_checker.check_user_file()
                 except Exception as userfileerror:
                     print(userfileerror)
@@ -860,7 +872,7 @@ def main():
                         #now add back in the original path so we have our full file path
                         safe_file_name = f'{userdata}{slash}{safe_file_name}'
                         print(f"Running with user list {i} of {len(file_list)} : {safe_file_name}")
-                        url_checker = UrlChecker(tenantname, target_domain, environment, endpoint, safe_file_name, appendString, skip_tried)
+                        url_checker = UrlChecker(tenantname, target_domain, environment, endpoint, safe_file_name, appendString, skip_tried,safe_domain)
                         if url_checker.tenant_exists:
                             url_checker.check_user_file()
                     except:
@@ -892,7 +904,7 @@ def main():
                         safe_file_name = currentfile.rstrip()
                         print(f"Running with user list {i} of {total_lines}: {currentfile}")
                         try:
-                            url_checker = UrlChecker(tenantname, target_domain, environment, endpoint, safe_file_name, appendString, skip_tried)
+                            url_checker = UrlChecker(tenantname, target_domain, environment, endpoint, safe_file_name, appendString, skip_tried,safe_domain)
                             if url_checker.tenant_exists:
                                 url_checker.check_user_file()
                         except:
