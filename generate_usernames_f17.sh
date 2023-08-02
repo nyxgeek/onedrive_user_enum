@@ -53,6 +53,10 @@ echo "(you still have time to CTRL-C for about 10 seconds)"
 sleep 10
 echo "Starting username generation..."
 
+if [ "$1" == "" || "$2" == ""]; then
+    echo "You need to specify the first and last name files"
+    exit
+fi
 
 FIRSTNAMES=$1
 LASTNAMES=$2
