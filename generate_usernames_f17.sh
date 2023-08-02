@@ -50,13 +50,13 @@ echo " HEY! THIS IS GOING TO TAKE A LONG LONG TIME, AND WILL TAKE UP LIKE 10GB o
 echo "******************************************************************************************"
 echo ""
 echo "(you still have time to CTRL-C for about 10 seconds)"
-sleep 10
-echo "Starting username generation..."
-
-if [ "$1" == "" || "$2" == ""]; then
-    echo "You need to specify the first and last name files"
+if [[ -z $1 ||  -z $2 ]]; then
+	echo "You need to specify the first and last name files"
     exit
 fi
+
+sleep 10
+echo "Starting username generation..."
 
 FIRSTNAMES=$1
 LASTNAMES=$2
