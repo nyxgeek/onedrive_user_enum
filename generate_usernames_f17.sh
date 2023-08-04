@@ -165,7 +165,7 @@ TMPLASTNAME="/tmp/last.tmp"
 cat "$1" | head -n 500 > ${TMPFIRSTNAME}
 cat "$2" | head -n 20000 > ${TMPLASTNAME}
 
-time while read FIRSTNAME; do while read LASTNAME; do echo "${FIRSTNAME}.${LASTNAME}" >> ${TMPPATH}/full.txt; done< ${TMPFIRSTNAME}; done <  ${TMPLASTNAME}
+time while read FIRSTNAME; do while read LASTNAME; do echo "${FIRSTNAME}.${LASTNAME}" >> ${TMPPATH}/full.txt; done< ${TMPLASTNAME}; done <  ${TMPFIRSTNAME}
 cd ${TMPPATH}
 split -l 175000 full.txt
 rm full.txt
@@ -182,7 +182,7 @@ TMPLASTNAME="/tmp/last.tmp"
 cat "$1" | head -n 200 > ${TMPFIRSTNAME}
 cat "$2" | head -n 50000 > ${TMPLASTNAME}
 
-time while read FIRSTNAME; do while read LASTNAME; do echo "${FIRSTNAME}.${LASTNAME}" >> ${TMPPATH}/full.txt; done< ${TMPFIRSTNAME}; done <  ${TMPLASTNAME}
+time while read FIRSTNAME; do while read LASTNAME; do echo "${FIRSTNAME}.${LASTNAME}" >> ${TMPPATH}/full.txt; done< ${TMPLASTNAME}; done <  ${TMPFIRSTNAME}
 cd ${TMPPATH}
 split -l 175000 full.txt
 rm full.txt
@@ -201,7 +201,7 @@ TMPLASTNAME="/tmp/last.tmp"
 cat "$1" | head -n 1000 > ${TMPFIRSTNAME}
 cat "$2" | head -n 10000 > ${TMPLASTNAME}
 
-time while read FIRSTNAME; do while read LASTNAME; do echo "${FIRSTNAME}.${LASTNAME}" >> ${TMPPATH}/full.txt; done< ${TMPFIRSTNAME}; done <  ${TMPLASTNAME}
+time while read FIRSTNAME; do while read LASTNAME; do echo "${FIRSTNAME}.${LASTNAME}" >> ${TMPPATH}/full.txt; done< ${TMPLASTNAME}; done <  ${TMPFIRSTNAME}
 cd ${TMPPATH}
 split -l 175000 full.txt
 rm full.txt
