@@ -641,36 +641,43 @@ def signal_handler(sig, frame):
 
 
 def export_sql_users(domain):
-    #instead of sql_export_valid_users
     if enable_db:
         if verbose:
             print("Exporting users")
         try:
             conn = sqlite3.connect(sqldb_location)
             getUsersQuery = f"SELECT email_address FROM onedrive_enum WHERE domain = '{domain}';"
-            #print(getUsersQuery)
             result = conn.execute(getUsersQuery)
-            #resultcount = len(result.fetchall())
             export_results = result.fetchall()
             resultcount = len(export_results)
             conn.commit()
-            #print(result.fetchall())
+
             now = datetime.now()
             formatted_date = now.strftime("%Y%m%d")
             output_filename = f'emails_{domain}_{formatted_date}.txt'
-            with open(output_filename, 'w') as f:  # 'w' means write mode which overwrites existing contents
+
+            # Load existing emails if the file already exists
+            existing_emails = set()
+            if os.path.exists(output_filename):
+                with open(output_filename, 'r') as f:
+                    for line in f:
+                        existing_emails.add(line.strip())
+                        
+            # Write only new emails to the file
+            with open(output_filename, 'a') as f:  # 'a' means append mode which doesn't overwrite existing contents
                 for user in export_results:
-                    f.write(user[0] + '\n')  # write each email on a new line
+                    if user[0] not in existing_emails:
+                        f.write(user[0] + '\n')  # write each new email on a new line
             conn.close()
-            print(f"{resultcount} emails have been written to {output_filename}")
+            print(f"{resultcount} emails have been processed and new ones have been written to {output_filename}")
         except sqlite3.Error as er:
-            print("Some SQLite error in sql_check_tried_usernames! Maybe write some better logging next time.")
+            print("Some SQLite error occurred! Maybe write some better logging next time.")
             print('SQLite error: %s' % (' '.join(er.args)))
             print("Exception class is: ", er.__class__)
             print('SQLite traceback: ')
             exc_type, exc_value, exc_tb = sys.exc_info()
             print(traceback.format_exception(exc_type, exc_value, exc_tb))
-            print("Some SQLite error in sql_export_valid_users! Maybe write some better logging next time.")
+            print("Some SQLite error occurred! Maybe write some better logging next time.")
 
 def main():
     global rerun, thread_count, enable_db, killafter, enableKillAfter, verbose, debug
