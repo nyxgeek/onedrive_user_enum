@@ -1,5 +1,5 @@
 
-# onedrive_user_enum v2.00
+# onedrive_user_enum v2.10
 enumerate valid onedrive users
 
 For a full rundown of the enumeration technique and OneDrive enum, check out the blog here:
@@ -9,13 +9,21 @@ https://www.trustedsec.com/blog/onedrive-to-enum-them-all/
 
 
 
-### Now featuring:
+### New features in 2.10:
+* Remote MySQL DB logging option -- log to a remote database
+* PAUSEFILE -- if pausefile is present (/tmp/PAUSEFILE), pause enumeration
+* Truncate userlist to x characters -- johnsmith -> johnsmi
+
+### New features in 2.00:
 * Local Database (sqlite3)
 * Auto-lookup of tenants (thanks @DrAzureAD and @thetechr0mancer)
 * Read in file OR folder of files
 * Append -- easily create 'jsmith1' 'jsmith2' sprays
 * Skip-Tried (de-dupe) -- remove previously tried usernames
 * Kill-After -- cancel a userlist if no usernames identified within 'x' attempts
+
+
+
 
 ## OneDrive Enumeration overview:
 OneDrive users have a file share URL with a known location:
@@ -47,7 +55,7 @@ The results may vary depending on how widely used OneDrive is within an org. Cur
    ██████  ████████   █████ ████ █████████████      +-------------------------------------------------+
   ███░░███░░███░░███ ░░███ ░███ ░░███░░███░░███     |               OneDrive Enumerator               |
  ░███████  ░███ ░███  ░███ ░███  ░███ ░███ ░███     |           2023 @nyxgeek - TrustedSec            |
- ░███░░░   ░███ ░███  ░███ ░███  ░███ ░███ ░███     |                 version 2.00                    |
+ ░███░░░   ░███ ░███  ░███ ░███  ░███ ░███ ░███     |                 version 2.10                    |
  ░░██████  ████ █████ ░░████████ █████░███ █████    |  https://github.com/nyxgeek/onedrive_user_enum  |
   ░░░░░░  ░░░░ ░░░░░   ░░░░░░░░ ░░░░░ ░░░ ░░░░░     +-------------------------------------------------+
                                                                              
@@ -70,11 +78,12 @@ options:
   -n, --no-db          disable logging to db
   -k , --killafter     kill off non-productive jobs after x tries with no success
   -v, --verbose        enable verbose output
+  -tr --truncate       truncate userlist at x characters
 
 
 ```
 
-## example:
+## example - basic usage:
 ```
 # ./onedrive_enum.py -t microsoft -d microsoft.com -U USERNAMES/statistically-likely/jsmith.txt
 
@@ -93,7 +102,7 @@ options:
    ██████  ████████   █████ ████ █████████████      +-------------------------------------------------+
   ███░░███░░███░░███ ░░███ ░███ ░░███░░███░░███     |               OneDrive Enumerator               |
  ░███████  ░███ ░███  ░███ ░███  ░███ ░███ ░███     |           2023 @nyxgeek - TrustedSec            |
- ░███░░░   ░███ ░███  ░███ ░███  ░███ ░███ ░███     |                 version 2.00                    |
+ ░███░░░   ░███ ░███  ░███ ░███  ░███ ░███ ░███     |                 version 2.10                    |
  ░░██████  ████ █████ ░░████████ █████░███ █████    |  https://github.com/nyxgeek/onedrive_user_enum  |
   ░░░░░░  ░░░░ ░░░░░   ░░░░░░░░ ░░░░░ ░░░ ░░░░░     +-------------------------------------------------+
                                                                              
@@ -108,8 +117,47 @@ Beginning enumeration of https://microsoft-my.sharepoint.com/personal/USER_micro
 
 ```
 
+## example - mysql db logging:
+```
+# ./onedrive_enum.py -t microsoft -d microsoft.com -U USERNAMES/statistically-likely/jsmith.txt -m db.conf
+
+*********************************************************************************************************
+
+                                         ██████               ███                          
+                                        ░░████               ░░░                           
+   ██████    █████████     ███████    ████████   █████████   ████   █████  █████   ███████ 
+  ███░░███  ░░███░░░███   ███░░░███  ███░░░███  ░░███░░░███ ░░███  ░░███  ░░███   ███░░░███
+ ░███  ░███  ░███  ░███  ░████████  ░███ ░░███   ░███  ░░░   ░███   ░███   ░███  ░████████ 
+ ░███  ░███  ░███  ░███  ░███░░░░   ░███ ░░███   ░███        ░███   ░░███  ███   ░███░░░   
+ ░░██████    ████  █████ ░░███████  ░░█████████  ██████      █████   ░░██████    ░░███████ 
+  ░░░░░░    ░░░░  ░░░░░   ░░░░░░░    ░░░░░░░░░  ░░░░░░      ░░░░░     ░░░░░░      ░░░░░░░  
+                                                                             
+                                                                             
+   ██████  ████████   █████ ████ █████████████      +-------------------------------------------------+
+  ███░░███░░███░░███ ░░███ ░███ ░░███░░███░░███     |               OneDrive Enumerator               |
+ ░███████  ░███ ░███  ░███ ░███  ░███ ░███ ░███     |           2023 @nyxgeek - TrustedSec            |
+ ░███░░░   ░███ ░███  ░███ ░███  ░███ ░███ ░███     |                 version 2.10                    |
+ ░░██████  ████ █████ ░░████████ █████░███ █████    |  https://github.com/nyxgeek/onedrive_user_enum  |
+  ░░░░░░  ░░░░ ░░░░░   ░░░░░░░░ ░░░░░ ░░░ ░░░░░     +-------------------------------------------------+
+                                                                             
+*********************************************************************************************************
+Test connection to mysql db was successful!
+
+Beginning enumeration of https://microsoft-my.sharepoint.com/personal/USER_microsoft_com/
+--------------------------------------------------------------------------------------------------------
+[-] [403] VALID USERNAME FOR microsoft,microsoft.com - user1, username:user1@microsoft.com
+[-] [403] VALID USERNAME FOR microsoft,microsoft.com - user2, username:user2@microsoft.com
+[-] [403] VALID USERNAME FOR microsoft,microsoft.com - user3, username:user3@microsoft.com
+
+
+```
 #### Note: Users that are valid but who have not yet signed into OneDrive will return a 404 not found.
 
+
+## references
+* https://github.com/Gerenios/AADInternals/
+* https://github.com/blacklanternsecurity/TREVORspray
+* https://github.com/nil0x42/duplicut
 
 ## sHoUtOuTz aNd GrEeTz
 
