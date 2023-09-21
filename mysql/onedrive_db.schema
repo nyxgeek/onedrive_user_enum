@@ -1,0 +1,88 @@
+-- MySQL dump 10.13  Distrib 8.0.34, for Linux (x86_64)
+--
+-- Host: localhost    Database: onedrive_db
+-- ------------------------------------------------------
+-- Server version       8.0.34-0ubuntu0.20.04.1
+
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!50503 SET NAMES utf8mb4 */;
+/*!40103 SET @OLD_TIME_ZONE=@@TIME_ZONE */;
+/*!40103 SET TIME_ZONE='+00:00' */;
+/*!40014 SET @OLD_UNIQUE_CHECKS=@@UNIQUE_CHECKS, UNIQUE_CHECKS=0 */;
+/*!40014 SET @OLD_FOREIGN_KEY_CHECKS=@@FOREIGN_KEY_CHECKS, FOREIGN_KEY_CHECKS=0 */;
+/*!40101 SET @OLD_SQL_MODE=@@SQL_MODE, SQL_MODE='NO_AUTO_VALUE_ON_ZERO' */;
+/*!40111 SET @OLD_SQL_NOTES=@@SQL_NOTES, SQL_NOTES=0 */;
+
+--
+-- Table structure for table `onedrive_enum`
+--
+
+DROP TABLE IF EXISTS `onedrive_enum`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `onedrive_enum` (
+  `email_address` varchar(255) NOT NULL,
+  `domain` varchar(255) NOT NULL,
+  `tenant` varchar(255) NOT NULL,
+  `username` varchar(255) NOT NULL,
+  `scrape_date_unix` int DEFAULT NULL,
+  `environment` varchar(255) DEFAULT NULL,
+  PRIMARY KEY (`email_address`),
+  KEY `scrape_date_unix` (`scrape_date_unix`),
+  KEY `domain` (`domain`),
+  KEY `domain_tenant_index` (`domain`,`tenant`)
+) ENGINE=InnoDB DEFAULT CHARSET=latin1;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `onedrive_log`
+--
+
+DROP TABLE IF EXISTS `onedrive_log`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `onedrive_log` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `start_date_unix` int DEFAULT NULL,
+  `userlist` varchar(255) NOT NULL,
+  `tenant` varchar(255) DEFAULT NULL,
+  `domain` varchar(255) DEFAULT NULL,
+  `environment` varchar(32) DEFAULT NULL,
+  `append` varchar(32) DEFAULT NULL,
+  `source_host` varchar(255) DEFAULT NULL,
+  `deduped` tinyint(1) DEFAULT NULL,
+  `end_date_unix` int DEFAULT NULL,
+  `found` int DEFAULT NULL,
+  `errors` int DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `update_lookup` (`start_date_unix`,`userlist`,`domain`,`tenant`)
+) ENGINE=InnoDB AUTO_INCREMENT=2826342 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
+-- Table structure for table `tenant_info`
+--
+
+DROP TABLE IF EXISTS `tenant_info`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `tenant_info` (
+  `primarytenant` varchar(50) NOT NULL,
+  `companyName` varchar(250) DEFAULT NULL,
+  `employeeCount` int DEFAULT NULL,
+  `category` varchar(100) DEFAULT NULL,
+  `sector` varchar(100) DEFAULT NULL,
+  `environment` varchar(50) DEFAULT NULL,
+  `onedriveEnabled` tinyint(1) DEFAULT NULL,
+  `isF500` tinyint(1) DEFAULT NULL,
+  `isF1000` tinyint(1) DEFAULT NULL,
+  `isEdu` tinyint(1) DEFAULT NULL,
+  `isStateGov` tinyint(1) DEFAULT NULL,
+  `isFedGov` tinyint(1) DEFAULT NULL,
+  `isUSA` tinyint(1) DEFAULT NULL,
+  `isGlobal` tinyint(1) DEFAULT NULL,
+  UNIQUE KEY `primarytenant` (`primarytenant`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;

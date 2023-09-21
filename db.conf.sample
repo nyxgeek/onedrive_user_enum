@@ -1,0 +1,6 @@
+[mysql]
+host = myserver.notafakedomain.com
+database = onedrive_db
+user = goblin
+password = s3cretp4sSw0rdCh4ng3Me
+port = 3306

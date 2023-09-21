@@ -1,0 +1,30 @@
+# Notes on setup of mysql server for remote logging
+# 2023 @nyxgeek
+
+1. Install mysql-server, configure mysql to be accessible on private or public IP
+
+2. Create blank database
+
+mysql -u root
+
+CREATE DATABASE onedrive_db;
+
+exit
+
+3. Import mysql schema
+
+mysql -u root onedrive_db < onedrive_db.schema
+
+
+4. Create a User and Grant Permissions
+
+mysql -u root
+
+CREATE USER 'goblin'@'%' IDENTIFIED BY 's3cretp4sSw0rdCh4ng3Me';
+
+GRANT ALL PRIVILEGES ON onedrive_db.* TO 'goblin'@'%';
+
+exit
+
+
+

@@ -23,10 +23,13 @@ import threading
 from threading import Semaphore
 import argparse
 import subprocess
+import mysql.connector
+from mysql.connector import errorcode
+import configparser
+import traceback
 
 ############ OUR CONSTANTS HERE:'
 sqldb_location = 'data/onedrive_enum.db'
-outputfilename = "output.log"
 oddlog = "odd.log"
 survey_wordlist = "USERNAMES/survey_top175.txt"
 hostname = socket.gethostname()
@@ -39,6 +42,7 @@ rerun = False
 exitRequested = False
 verbose = False
 debug = False
+truncate = None
 
 
 #might move some or all of these down to main
@@ -46,6 +50,7 @@ enableKillAfter = False
 killafter=10000
 environment = "commercial"
 endpoint = "sharepoint.com"
+
 writeLock = Semaphore(value = 1)
 
 
@@ -67,29 +72,17 @@ print("                                                                         
 print("   ██████  ████████   █████ ████ █████████████      +-------------------------------------------------+")
 print("  ███░░███░░███░░███ ░░███ ░███ ░░███░░███░░███     |               OneDrive Enumerator               |")
 print(" ░███████  ░███ ░███  ░███ ░███  ░███ ░███ ░███     |           2023 @nyxgeek - TrustedSec            |")
-print(" ░███░░░   ░███ ░███  ░███ ░███  ░███ ░███ ░███     |                 version 2.00                    |")
+print(" ░███░░░   ░███ ░███  ░███ ░███  ░███ ░███ ░███     |                 version 2.10                    |")
 print(" ░░██████  ████ █████ ░░████████ █████░███ █████    |  https://github.com/nyxgeek/onedrive_user_enum  |")
 print("  ░░░░░░  ░░░░ ░░░░░   ░░░░░░░░ ░░░░░ ░░░ ░░░░░     +-------------------------------------------------+")
 print("                                                                             ")
 print("*********************************************************************************************************")
-                                                                            
-                                                                            
-
-
-
-#print("\n+-----------------------------------------------------+")
-#print("|                 OneDrive Enumerator                 |")
-#print("|             2023 @nyxgeek - TrustedSec              |")
-#print("|                   version 1.99g                     |")
-#print("|    https://github.com/nyxgeek/onedrive_user_enum    |")
-#print("+-----------------------------------------------------+\n")
-
 
 
 
 class UrlChecker:
     """Check URLs and handle associated operations."""
-    def __init__(self, tenant_name, domain, environment, endpoint, userdata, appendString, skip_tried):
+    def __init__(self, tenant_name, domain, environment, endpoint, userdata, appendString, skip_tried, mysql_conf):
         self.tenant_name = tenant_name.rstrip().lower()
         self.domain = domain.rstrip().lower()
         self.safe_domain = self.domain.replace(".", "_")
@@ -107,23 +100,130 @@ class UrlChecker:
         self.totalcount = 0
         self.start_unix_time = 0
         self.status = '0'
+        self.mysql_host = None
+        self.mysql_db = None
+        self.mysql_user = None
+        self.mysql_pass = None
+        self.mysql_port = 3306
+
+        if mysql_conf:
+            self.mysql_enabled = True
+            self.get_sql_conf(mysql_conf)
+        else:
+            self.mysql_enabled = False
+
         self.tenant_exists = self.test_connect()
 
     #>>>>> Database Functions
 
     def sql_create_table(self):
         #if table does not exist
-        create_onedrive_enum = f"create table onedrive_enum(email_address text, username text, domain text, tenant text, scrape_date_unix int, environment text);"
+        create_onedrive_enum = f"create table onedrive_enum(email_address text UNIQUE, username text, domain text, tenant text, scrape_date_unix int, environment text);"
         create_onedrive_log = f"create table onedrive_log(ID INTEGER PRIMARY KEY autoincrement, userlist text, domain text, tenant text, environment text, append text, source_host text, deduped int, start_date_unix int, end_date_unix int, found int, errors int);"
+        
+
+    def get_sql_conf(self,mysql_conf):
+        # this gets the sql configuration and saves it in self
+        config = configparser.ConfigParser()
+        if verbose:
+            print(f"Config File is at {mysql_conf}")
+
+        #read in our config file
+        try:
+            config.read(mysql_conf)
+
+            try:
+                #here we are going to translate the domain name to an IP so we don't have any DNS issues later
+                self.mysql_host = socket.gethostbyname(config['mysql']['host'])
+                self.mysql_db = config['mysql']['database']
+                self.mysql_user = config['mysql']['user']
+                self.mysql_pass = config['mysql']['password']
+                self.mysql_port = config['mysql']['port']
+
+                if verbose:
+                    print(f"Host: {self.mysql_host}:{self.mysql_port}")
+                    print(f"Database: {self.mysql_db}")
+
+            except:
+                print(f"ERROR: Could not connect to {self.mysql_db} at {self.mysql_host}:{self.mysql_port}. Verify data in config file")
+        except:
+            print(f"ERROR: Could not read data in config file")
+
+
+    def run_mysql_query(self, mysql_query):
+        # this runs a mysql query
+                # now attempt to connect
+        try:
+            mydb = mysql.connector.connect(
+              host=self.mysql_host,
+              user=self.mysql_user,
+              password=self.mysql_pass,
+              database=self.mysql_db,
+              port=self.mysql_port
+            )
+            mydb.autocommit = True
+            databaseHelper = mydb.cursor()
+            databaseHelper.execute(mysql_query)
+            results = databaseHelper.fetchall()
+            mydb.close()
+            return results
+
+        except mysql.connector.Error as e:
+            print("Some SQL Error code in run_mysql_query:", e.errno)        # error number
+            print("** Try reducing your number of threads and see if this error disappears. **")
+            print("SQLSTATE value:", e.sqlstate) # SQLSTATE value
+            print("Error message:", e.msg)       # error message
+            print("Error:", e)                  # errno, sqlstate, msg values
+            s = str(e)
+            print("Error:", s)                   # errno, sqlstate, msg values
+            time.sleep(5)
+
+
+    def run_sqlite_query(self, sqlite_query):
+        # this runs a sqlite query
+        try:
+            conn = sqlite3.connect(sqldb_location)
+            if verbose:
+                print(f"sqlite query is: {sqlite_query}")
+        except:
+            print("Error connecting to sqlite db")
+ 
+        try:
+            cursor = conn.execute(sqlite_query)
+            conn.commit()
+            results = cursor.fetchall()
+            return results
+                    
+        except sqlite3.Error as er:
+            print("Some SQLite error in run_sqlite_query!")
+            print('SQLite error: %s' % (' '.join(er.args)))
+            print("Exception class is: ", er.__class__)
+            print('SQLite traceback: ')
+            exc_type, exc_value, exc_tb = sys.exc_info()
+            print(traceback.format_exception(exc_type, exc_value, exc_tb))
+        finally:
+            conn.close()
+
 
     def sql_check_for_previous_runs(self, userfile):
         if verbose:
             print("Checking for previous runs of this exact combination.")
         try:
-            conn = sqlite3.connect(sqldb_location)
             checkLogsQuery = f"SELECT userlist FROM onedrive_log WHERE domain = '{self.domain}' AND tenant = '{self.tenant_name}' AND userlist = '{userfile}' AND environment = '{self.environment}' AND append = '{self.appendString}' AND end_date_unix IS NOT NULL AND end_date_unix != '1337000004';"
-            cursor = conn.execute(checkLogsQuery)
-            tmprows = len(cursor.fetchall())
+
+            if self.mysql_enabled:
+                if debug:
+                    print("trying to get length")
+                tmprows = len(self.run_mysql_query(checkLogsQuery))
+                if debug:
+                    print(f"length is {tmprows}")
+            else:
+                if debug:
+                    print("trying to get length")
+                tmprows = len(self.run_sqlite_query(checkLogsQuery))
+                if debug:
+                    print(f"length is {tmprows}")
+
             if (int(tmprows) > 0):
                 if rerun:
                     if verbose:
@@ -131,41 +231,30 @@ class UrlChecker:
                         pass
                 else:
                     print(f'INFO: This has been run before. To force a re-run use the -r flag. Exiting.\n\n')
-                    #exit()
                     quit()
-                    #return
-                    
-        except sqlite3.Error as er:
-            print("Some SQLite error in sql_check_for_previous_runs! Maybe write some better logging next time.")
-            print('SQLite error: %s' % (' '.join(er.args)))
-            print("Exception class is: ", er.__class__)
-            print('SQLite traceback: ')
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            print(traceback.format_exception(exc_type, exc_value, exc_tb))
-        finally:
-            conn.close()
+        except Exception:
+            print(f"Error checking for previous runs")
+
 
     def sql_check_tried_usernames(self):
         if verbose:
             print("Checking our tried users.")
+
+        checkLogsQuery = f"SELECT userlist FROM onedrive_log WHERE domain = '{self.domain}' AND tenant = '{self.tenant_name}' AND environment = '{self.environment}' AND append = '{self.appendString}' AND end_date_unix IS NOT NULL AND end_date_unix != '1337000004';"
+
+        if verbose:
+            print(checkLogsQuery)
+
         try:
-            conn = sqlite3.connect(sqldb_location)
-            checkLogsQuery = f"SELECT userlist FROM onedrive_log WHERE domain = '{self.domain}' AND tenant = '{self.tenant_name}' AND environment = '{self.environment}' AND append = '{self.appendString}' AND end_date_unix IS NOT NULL AND end_date_unix != '1337000004';"
-            if verbose:
-                print(checkLogsQuery)
-            cursor = conn.execute(checkLogsQuery)
-            result = cursor.fetchall()
-            #conn.close()
+            if self.mysql_enabled:
+                result = self.run_mysql_query(checkLogsQuery)
+            else:
+                result = self.run_sqlite_query(checkLogsQuery)
             return result
-        except sqlite3.Error as er:
-            print("Some SQLite error in sql_check_tried_usernames! Maybe write some better logging next time.")
-            print('SQLite error: %s' % (' '.join(er.args)))
-            print("Exception class is: ", er.__class__)
-            print('SQLite traceback: ')
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            print(traceback.format_exception(exc_type, exc_value, exc_tb))
-        finally:
-            conn.close()
+        
+        except:
+            print(f"Error checking for tried usernames")
+
 
     def sql_log_current_run(self, userlist):
         if enable_db:
@@ -177,35 +266,39 @@ class UrlChecker:
             else:
                 deduped = '0'               
             try:
-                conn = sqlite3.connect(sqldb_location)
                 insertLogsQuery = f"INSERT INTO onedrive_log (tenant, domain, userlist, start_date_unix, environment, append, source_host, deduped) VALUES ('{self.tenant_name}','{self.domain}','{userlist}','{self.start_unix_time}','{self.environment}','{self.appendString}','{hostname}','{deduped}');"
                 if debug:
                     print(insertLogsQuery)
-                conn.execute(insertLogsQuery)
-                conn.commit()
-                conn.close()
+
+                if self.mysql_enabled:
+                    self.run_mysql_query(insertLogsQuery)
+                else:
+                    self.run_sqlite_query(insertLogsQuery)
             except:
-                print("Some SQLite error in sql_log_current_run! Maybe write some better logging next time.")
+                print("Some SQL or SQLite error in sql_log_current_run! Maybe write some better logging next time.")
 
 
     def sql_insert_user(self, email_address, username, domain, tenant, currenttime, environment):
         try:
-            conn = sqlite3.connect(sqldb_location)
-            sql_query = f"INSERT OR IGNORE INTO onedrive_enum (email_address,username, domain, tenant, scrape_date_unix, environment) VALUES ('{email_address}','{username}','{domain}','{tenant}','{currenttime}','{environment}');"
-            if debug:
-                print(sql_query)
-            conn.execute(sql_query)
-            conn.commit()
-            conn.close()
+            if self.mysql_enabled:
+                sql_query = f"INSERT IGNORE INTO onedrive_enum (email_address,username, domain, tenant, scrape_date_unix, environment) VALUES ('{email_address}','{username}','{domain}','{tenant}','{currenttime}','{environment}');"
+                if debug:
+                    print(sql_query)
+                self.run_mysql_query(sql_query)
+            else:
+                sql_query = f"INSERT OR IGNORE INTO onedrive_enum (email_address,username, domain, tenant, scrape_date_unix, environment) VALUES ('{email_address}','{username}','{domain}','{tenant}','{currenttime}','{environment}');"
+                if debug:
+                    print(sql_query)
+                results = self.run_sqlite_query(sql_query)
         except:
-            print("Some SQLite error in sql_insert_user! Maybe write some better logging next time.")
+            print("Some SQL or SQLite error in sql_insert_user! Maybe write some better logging next time.")
 
 
     def sql_log_completed_run(self, userlist):
         #print(self.status)
         if self.status != '0':
-            print("Status is {0}".format(status))
-            end_unix_time = status
+            print("Status is {0}".format(self.status))
+            end_unix_time = self.status
         else:
             end_unix_time = str(int(time.time()))
 
@@ -213,17 +306,15 @@ class UrlChecker:
             if verbose:
                 print("Logging current run as complete")
             try:
-                conn = sqlite3.connect(sqldb_location)
                 logCompletedLogsQuery = f"UPDATE onedrive_log SET end_date_unix = {end_unix_time}, found = {self.validcount}, errors = {self.errorcount} WHERE  domain = '{self.domain}' AND userlist = '{userlist}' AND tenant = '{self.tenant_name}' AND start_date_unix = '{self.start_unix_time}';"
                 if debug:
                     print(logCompletedLogsQuery)
-                conn.execute(logCompletedLogsQuery)
-                conn.commit()
-                conn.close()
+                if self.mysql_enabled:
+                    self.run_mysql_query(logCompletedLogsQuery)
+                else:
+                    self.run_sqlite_query(logCompletedLogsQuery)
             except:
-                print("Some SQLite error in sql_log_completed_run! Maybe write some better logging next time.")
-
-
+                print("Some SQL or SQLite error in sql_log_completed_run! Maybe write some better logging next time.")
 
 
     def sql_export_valid_users(self):
@@ -231,24 +322,25 @@ class UrlChecker:
             if verbose:
                 print("Exporting users")
             try:
-                conn = sqlite3.connect(sqldb_location)
-                getUsersQuery = f"SELECT email_address FROM onedrive_enum WHERE domain = '{self.domain}' AND tenant = '{self.tenant}' AND environment = '{self.environment}';"
+                getUsersQuery = f"SELECT email_address FROM onedrive_enum WHERE domain = '{self.domain}';"
+
                 if verbose:
                     print(getUsersQuery)
-                conn.execute(getUsersQuery)
-                conn.commit()
-                conn.close()
-            except sqlite3.Error as er:
-                print("Some SQLite error in sql_check_tried_usernames! Maybe write some better logging next time.")
-                print('SQLite error: %s' % (' '.join(er.args)))
-                print("Exception class is: ", er.__class__)
-                print('SQLite traceback: ')
-                exc_type, exc_value, exc_tb = sys.exc_info()
-                print(traceback.format_exception(exc_type, exc_value, exc_tb))
-                print("Some SQLite error in sql_export_valid_users! Maybe write some better logging next time.")
+                if self.mysql_enabled:
+                    results = self.run_mysql_query(getUsersQuery)
+                else:
+                    results = self.run_sqlite_query(getUsersQuery)
 
-
-
+                resultcount = len(results)
+                now = datetime.now()
+                formatted_date = now.strftime("%Y%m%d")
+                output_filename = f'emails_{self.domain}_{formatted_date}.txt'
+                with open(output_filename, 'w') as f:  # 'w' means write mode which overwrites existing contents
+                    for user in results:
+                        f.write(user[0] + '\n')  # write each email on a new line
+                print(f"{resultcount} emails have been written to {output_filename}")
+            except:
+                print("Some SQL or SQLite error in sql_export_valid_users! Maybe write some better logging next time.")
 
 
     #>>>>> requests special function
@@ -272,10 +364,19 @@ class UrlChecker:
         return session
 
 
-
     #>>>>> OneDrive Lookup Functions
 
     def check_url(self, username):
+
+        # If this pause file exists, we wait. This way we can remotely push a pause file out to halt all operations temporarily
+        if (os.path.isfile("/tmp/PAUSEFILE")):
+            while (os.path.isfile("/tmp/PAUSEFILE")):
+                currenttime=datetime.now()
+                print(f'\r        {currenttime.strftime("%c")}: PAUSE FILE FOUND: Sleeping ...            \r', end='', flush=True)
+                time.sleep(10)
+            print("\n")
+
+
         """Check a URL and handle associated operations."""
         username = username.rstrip()
         safeusername = (username).replace(".","_")
@@ -314,9 +415,9 @@ class UrlChecker:
                 pass
             elif status_code in ['301', '302', '200']:
                 currenttime = str(int(time.time()))
-                print(f'[-] [{status_code}] WEIRD RESPONSE FOR {self.tenant_name},{self.domain} - {username}, username:{username}@{self.domain}')
+                print(f'[-] [{status_code}] Odd RESPONSE FOR {self.tenant_name},{self.domain} - {username}, username:{username}@{self.domain}')
                 if verbose:
-                    print("WE GOT A WEIRD ONE! Logging this to the OTHER db")
+                    print("Account renamed")
                 pass
             else:
                 print(f'[?] [{status_code} UNKNOWN RESPONSE FOR {self.tenant_name},{self.domain} - {username}, username:{username}@{self.domain}')
@@ -389,9 +490,6 @@ class UrlChecker:
                     print("\n{0} thread remaining: Closing down gracefully.\n".format(int(threading.active_count())))
                     time.sleep(5)
                 print("")
-                of = open((os.path.abspath(outputfilename)),"a")
-                of.write("CANCELLED\n")
-                of.close()
 
                 print("MARK IT A ZERO! We are gonna put in 1337000004 as our end time to denote a CANCEL")
                 self.status = "1337000004"
@@ -417,11 +515,6 @@ class UrlChecker:
         # log the completion to our db
         self.sql_log_completed_run(self.userdata)
 
-
-        #print("before export")
-
-        # export our users
-        #self.sql_export_valid_users()
 
     def test_connect(self):
         """Test the connection by checking a test URL."""
@@ -469,16 +562,6 @@ class UrlChecker:
             if verbose:
                 print(f"Count is {oCountText}")
 
-        #concat_wordlists = ""
-        #for wordlist in result:
-        #    wordlist = wordlist[0]
-        #    if wordlist not in concat_wordlists:
-        #        concat_wordlists += wordlist+ " "
-
-        #print("Done compiling runs")
-
-
-
         result = self.sql_check_tried_usernames()
         # we need this to be in a format where 'cat' can read it in, space separated values -- 'USERFILES/test1.txt USERFILES/test2.txt'
         list_of_files = ""
@@ -516,9 +599,6 @@ class UrlChecker:
             if enable_db:
                 #self.logCompleteCurrentRunNew(userlist, self.tenant_name, self.domain, status)
                 self.sql_log_completed_run(self.userdata)
-            of = open((os.path.abspath(outputfilename)),"a")
-            of.write("NO_NEW\n")
-            of.close()
             exit()
 
         #update our instance data
@@ -640,37 +720,57 @@ def signal_handler(sig, frame):
         exitRequested = True
 
 
-def export_sql_users(domain):
-    #instead of sql_export_valid_users
-    if enable_db:
-        if verbose:
-            print("Exporting users")
+def test_mysql_connect(mysql_conf):
+    config = configparser.ConfigParser()
+    if verbose:
+        print(f"Config File is at {mysql_conf}")
+
+    #read in our config file
+    try:
+        config.read(mysql_conf)
+
         try:
-            conn = sqlite3.connect(sqldb_location)
-            getUsersQuery = f"SELECT email_address FROM onedrive_enum WHERE domain = '{domain}';"
-            #print(getUsersQuery)
-            result = conn.execute(getUsersQuery)
-            #resultcount = len(result.fetchall())
-            export_results = result.fetchall()
-            resultcount = len(export_results)
-            conn.commit()
-            #print(result.fetchall())
-            now = datetime.now()
-            formatted_date = now.strftime("%Y%m%d")
-            output_filename = f'emails_{domain}_{formatted_date}.txt'
-            with open(output_filename, 'w') as f:  # 'w' means write mode which overwrites existing contents
-                for user in export_results:
-                    f.write(user[0] + '\n')  # write each email on a new line
-            conn.close()
-            print(f"{resultcount} emails have been written to {output_filename}")
-        except sqlite3.Error as er:
-            print("Some SQLite error in sql_check_tried_usernames! Maybe write some better logging next time.")
-            print('SQLite error: %s' % (' '.join(er.args)))
-            print("Exception class is: ", er.__class__)
-            print('SQLite traceback: ')
-            exc_type, exc_value, exc_tb = sys.exc_info()
-            print(traceback.format_exception(exc_type, exc_value, exc_tb))
-            print("Some SQLite error in sql_export_valid_users! Maybe write some better logging next time.")
+            host = config['mysql']['host']
+            database = config['mysql']['database']
+            user = config['mysql']['user']
+            password = config['mysql']['password']
+            port = config['mysql']['port']
+
+            if verbose:
+                print(f"Host: {host}:{port}")
+                print(f"Database: {database}")
+        except:
+            print(f"ERROR: Could not get values from the config file")
+
+        # now attempt to connect
+        try:
+            mydb = mysql.connector.connect(
+              host=host,
+              user=user,
+              password=password,
+              database=database
+            )
+            mydb.autocommit = True
+            databaseHelper = mydb.cursor()
+            databaseHelper.execute("SELECT VERSION()")
+            result = databaseHelper.fetchall()
+            mydb.close()
+            return result
+
+        except mysql.connector.Error as e:
+            print("Error code:", e.errno)        # error number
+            print("SQLSTATE value:", e.sqlstate) # SQLSTATE value
+            print("Error message:", e.msg)       # error message
+            print("Error:", e)                  # errno, sqlstate, msg values
+            s = str(e)
+            print("Error:", s)                   # errno, sqlstate, msg values
+            time.sleep(5)
+        except:
+            print(f"ERROR: Could not connect to {database} at {host}:{port}. Verify data in config file")
+    except:
+        print(f"ERROR: Could not read data in config file")
+
+
 
 def main():
     global rerun, thread_count, enable_db, killafter, enableKillAfter, verbose, debug
@@ -690,7 +790,6 @@ def main():
     parser.add_argument("-a", "--append", help="mutator: append a number, character, or string to a username", metavar='')
     parser.add_argument("-U", "--userfile", help="file containing usernames (wordlists) -- will also take a directory", metavar='')
     parser.add_argument("-p", "--playlist", help="file containing list of paths to user lists (wordlists) to try", metavar='')
-    parser.add_argument("-o", "--output", help="file to write output to (default: output.log)", default="output.log", metavar='')
     parser.add_argument("-T", "--threads", help="total number of threads (defaut: 100)",default=100, metavar='')
     parser.add_argument("-e", "--environment", help="Azure environment to target [commercial (default), chinese, gov]", metavar='')
     parser.add_argument("-r", "--rerun", help="force re-run of previously tested tenant/domain/wordlist combination", action='store_true')
@@ -699,6 +798,8 @@ def main():
     parser.add_argument("-k", "--killafter", help="kill off non-productive jobs after x tries with no success", metavar='')
     parser.add_argument("-v", "--verbose", help="enable verbose output", action='store_true', default=False)
     parser.add_argument("-D", "--debug", help="enable debug output", action='store_true', default=False)
+    parser.add_argument("-tr", "--truncate", help="truncate to x characters", metavar='')
+    parser.add_argument("-m", "--mysql", help="file containing mysql data (db.conf)", metavar='')
 
     # read arguments from the command line
     args = parser.parse_args()
@@ -709,6 +810,7 @@ def main():
     isUser = False
     isUserFile = False
     isPlaylist = False
+
 
     if verbose:
         print("Verbose is ON")
@@ -750,10 +852,6 @@ def main():
         playlist = args.playlist
         isPlaylist = True
 
-    outputfilename = args.output
-    if verbose:
-        print("Output file: {}".format(outputfilename))
-
 
     skip_tried = args.skip_tried
     if verbose:
@@ -763,6 +861,34 @@ def main():
         rerun = True
         skip_tried = False
 
+    if args.truncate:
+        truncate = args.truncate
+    else:
+        truncate = None
+
+    if args.mysql:
+        mysql_conf = args.mysql
+        try:
+            #check to see if file is there
+            if os.path.exists(mysql_conf):
+                #then check to make sure we can connect
+                try:
+                    if verbose:
+                        print("Testing connection")
+                    if (test_mysql_connect(mysql_conf)):
+                        print(f"Test connection to mysql db was successful!")
+                    else:
+                        print(f"Failed to connect to remote server. Please check your settings.")
+                        exit()
+                except Exception:
+                    print(f"ERROR: Could not connect to mysql db")
+                    exit()
+        except Exception:
+            print(f"ERROR: {mysql_conf} does not exist.")
+            exit()
+    else:
+        #mysql_enabled = False
+        mysql_conf = None
 
     if args.no_db:
         enable_db = False
@@ -815,7 +941,7 @@ def main():
             print("We are checking on a username")
         userdata = username
         try:
-            url_checker = UrlChecker(tenantname, target_domain, environment, endpoint, userdata, appendString, skip_tried)
+            url_checker = UrlChecker(tenantname, target_domain, environment, endpoint, userdata, appendString, skip_tried, mysql_conf)
             url_checker.check_user()
         except:
             if verbose:
@@ -827,21 +953,54 @@ def main():
 
     if isUserFile:
         userdata = userfile
+        tmp_truncated_users = '/tmp/onedrive_enum.truncated.users'
+
         #first check for file or folder status
         if os.path.exists(userfile):    #first see if it exists
             if os.path.isfile(userfile):    #then see if it's a file
                 try:
-                    url_checker = UrlChecker(tenantname, target_domain, environment, endpoint, userdata, appendString, skip_tried)
-                    url_checker.check_user_file()
+                    if truncate:
+                        if verbose:
+                            print(f"Truncating file.")
+                        try:
+                            truncate_cut = subprocess.run(['cut',f'-c1-{truncate}',userfile],check=True, capture_output=True)
+                        except:
+                            print("XCouldn't cut the file")
+
+                        try:
+                            if verbose:
+                                print("Trying duplicut")
+                            f_truncated = open(tmp_truncated_users, "w")
+
+                            try:
+                                truncate_results = subprocess.run(['duplicut','-o',tmp_truncated_users],input = truncate_cut.stdout)
+                            except:
+                                if verbose:
+                                    print("No duplicut - trying sort")
+                                pass
+                            try:
+                                truncate_results = subprocess.run(['sort','-u'],input=truncate_cut.stdout,stdout=f_truncated)
+                            except:
+                                print("well, truncate_results failed")
+                            f_truncated.close()
+                        except Exception:
+                            if verbose:
+                                print("Couldn't truncate. Sorry.")
+                        
+                        userdata = tmp_truncated_users
+
+                    url_checker = UrlChecker(tenantname, target_domain, environment, endpoint, userdata, appendString, skip_tried, mysql_conf)
+                    if url_checker.tenant_exists:
+                        url_checker.check_user_file()
                 except Exception as userfileerror:
                     print(userfileerror)
                     if verbose:
                         print("Whoops something happened there with a userfile")
                     pass
                 finally:
+                    url_checker.sql_export_valid_users()
                     del url_checker
                 print("Completed")
-                export_sql_users(target_domain)
 
             elif os.path.isdir(userfile):   #otherwise if it's a dir
                 if verbose:
@@ -860,7 +1019,7 @@ def main():
                         #now add back in the original path so we have our full file path
                         safe_file_name = f'{userdata}{slash}{safe_file_name}'
                         print(f"Running with user list {i} of {len(file_list)} : {safe_file_name}")
-                        url_checker = UrlChecker(tenantname, target_domain, environment, endpoint, safe_file_name, appendString, skip_tried)
+                        url_checker = UrlChecker(tenantname, target_domain, environment, endpoint, safe_file_name, appendString, skip_tried, mysql_conf)
                         if url_checker.tenant_exists:
                             url_checker.check_user_file()
                     except:
@@ -868,9 +1027,9 @@ def main():
                             print("Whoops - had an issue there with a file from the directory.")
                         pass
                     finally:
+                        url_checker.sql_export_valid_users()
                         del url_checker
                 print("Completed")
-                export_sql_users(target_domain)
 
 
         else:
@@ -892,7 +1051,7 @@ def main():
                         safe_file_name = currentfile.rstrip()
                         print(f"Running with user list {i} of {total_lines}: {currentfile}")
                         try:
-                            url_checker = UrlChecker(tenantname, target_domain, environment, endpoint, safe_file_name, appendString, skip_tried)
+                            url_checker = UrlChecker(tenantname, target_domain, environment, endpoint, safe_file_name, appendString, skip_tried, mysql_conf)
                             if url_checker.tenant_exists:
                                 url_checker.check_user_file()
                         except:
@@ -902,8 +1061,7 @@ def main():
                         finally:
                             del url_checker
                     print("Completed.")
-                    export_sql_users(target_domain)
-
+                    url_checker.sql_export_valid_users()
 
         else:
             print(f"ERROR: {playlist} does not exist.")
