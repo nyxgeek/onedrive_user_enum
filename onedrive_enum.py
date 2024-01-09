@@ -409,6 +409,11 @@ class UrlChecker:
             elif status_code in ['401', '403']:
                 currenttime = str(int(time.time()))
                 self.validcount+=1
+                #You need to create a file for the output and then specify that file here
+                output_filename = "/root/Test/onedrive_user_enum/securit_users.txt"
+                with open (output_filename, "a") as output_file:
+                  output_text = f'{username}@{self.domain}'
+                  output_file.write(output_text + '\n')
                 print(f'[-] [{status_code}] VALID USERNAME FOR {self.tenant_name},{self.domain} - {username}, username:{username}@{self.domain}')
                 reconstructed_email = username.replace("_",".") + "@" + self.domain
                 self.sql_insert_user(reconstructed_email, username, self.domain,self.tenant_name,currenttime,self.environment)
@@ -1066,8 +1071,6 @@ def main():
         else:
             print(f"ERROR: {playlist} does not exist.")
             exit()
-
-
 
 if __name__ == "__main__":
     main()
