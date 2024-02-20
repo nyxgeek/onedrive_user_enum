@@ -158,6 +158,7 @@ Beginning enumeration of https://microsoft-my.sharepoint.com/personal/USER_micro
 * https://github.com/Gerenios/AADInternals/
 * https://github.com/blacklanternsecurity/TREVORspray
 * https://github.com/nil0x42/duplicut
+* https://patorjk.com/ -- ascii art generator
 
 ## sHoUtOuTz aNd GrEeTz
 
