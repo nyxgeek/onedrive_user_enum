@@ -412,7 +412,6 @@ class UrlChecker:
                 #You need to create a file for the output and then specify that file here
                 currentdir = os.getcwd()
                 output_filename = currentdir + '/' + self.domain + ".txt"
-                print(output_filename)
                 with open (output_filename, "a") as output_file:
                   output_text = f'{username}@{self.domain}'
                   output_file.write(output_text + '\n')
