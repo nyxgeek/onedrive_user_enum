@@ -29,9 +29,10 @@ import configparser
 import traceback
 
 ############ OUR CONSTANTS HERE:'
-sqldb_location = 'data/onedrive_enum.db'
+onedrive_enum_dir = os.path.dirname(os.path.abspath(__file__))
+sqldb_location = onedrive_enum_dir + '/data/onedrive_enum.db'
 oddlog = "odd.log"
-survey_wordlist = "USERNAMES/survey_top175.txt"
+survey_wordlist = onedrive_enum_dir + '/USERNAMES/survey_top175.txt'
 hostname = socket.gethostname()
 
 
