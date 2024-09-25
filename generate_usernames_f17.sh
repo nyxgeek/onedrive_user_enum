@@ -95,6 +95,15 @@ split -l 175000 full.txt
 rm full.txt
 cd ${CURRENTDIR}
 
+#generate smithja
+echo "Generating smithja Last/First/Middle"
+TMPPATH="USERNAMES/tron_smithja_c1990"
+mkdir ${TMPPATH} 2>/dev/null
+time while read LASTNAME; do for letter in {a..z};do for middle in {a..z};do echo "${LASTNAME}${letter}${middle}" >> ${TMPPATH}/full.txt; done; done; done < $2
+cd ${TMPPATH}
+split -l 175000 full.txt
+rm full.txt
+cd ${CURRENTDIR}
 
 #generate smith.j
 echo "Generating smith.j"
