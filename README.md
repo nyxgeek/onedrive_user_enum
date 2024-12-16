@@ -61,25 +61,27 @@ The results may vary depending on how widely used OneDrive is within an org. Cur
   ░░░░░░  ░░░░ ░░░░░   ░░░░░░░░ ░░░░░ ░░░ ░░░░░     +-------------------------------------------------+
                                                                              
 *********************************************************************************************************
-usage: onedrive_enum.py [-h] -d  [-t] [-u] [-a] [-U] [-p] [-o] [-T] [-e] [-r] [-x] [-n] [-k] [-v]
+usage: onedrive_enum.py [-h] -d  [-t] [-e] [-u] [-U] [-p] [-a] [-tr] [-T] [-r] [-x] [-n] [-m] [-o] [-k] [-v] [-D]
 
 options:
   -h, --help           show this help message and exit
   -d , --domain        target domain name (required)
   -t , --tenant        tenant name
+  -e , --environment   Azure environment to target [commercial (default), chinese, gov]
   -u , --username      user to target
-  -a , --append        mutator: append a number, character, or string to a username
   -U , --userfile      file containing usernames (wordlists) -- will also take a directory
   -p , --playlist      file containing list of paths to user lists (wordlists) to try
-  -o , --output        file to write output to (default: output.log)
+  -a , --append        mutator: append a number, character, or string to a username
+  -tr , --truncate     truncate to x characters
   -T , --threads       total number of threads (defaut: 100)
-  -e , --environment   Azure environment to target [commercial (default), chinese, gov]
   -r, --rerun          force re-run of previously tested tenant/domain/wordlist combination
   -x, --skip-tried     dedupe. skip any usernames from previous runs
   -n, --no-db          disable logging to db
+  -m , --mysql         file containing mysql data (db.conf)
+  -o , --output        file to append found users to
   -k , --killafter     kill off non-productive jobs after x tries with no success
   -v, --verbose        enable verbose output
-  -tr --truncate       truncate userlist at x characters
+  -D, --debug          enable debug output
 
 
 ```
