@@ -20,7 +20,6 @@ import re
 import socket
 import signal
 import threading
-from threading import Semaphore
 import argparse
 import subprocess
 import mysql.connector
@@ -31,8 +30,7 @@ import traceback
 ############ OUR CONSTANTS HERE:'
 onedrive_enum_dir = os.path.dirname(os.path.abspath(__file__))
 sqldb_location = onedrive_enum_dir + '/data/onedrive_enum.db'
-oddlog = "odd.log"
-survey_wordlist = onedrive_enum_dir + '/USERNAMES/survey_top175.txt'
+survey_wordlist = 'USERNAMES/survey_script_top175_multi.txt'
 hostname = socket.gethostname()
 
 
@@ -52,7 +50,6 @@ killafter=10000
 environment = "commercial"
 endpoint = "sharepoint.com"
 
-writeLock = Semaphore(value = 1)
 
 
 print("")
@@ -83,7 +80,7 @@ print("*************************************************************************
 
 class UrlChecker:
     """Check URLs and handle associated operations."""
-    def __init__(self, tenant_name, domain, environment, endpoint, userdata, appendString, skip_tried, mysql_conf):
+    def __init__(self, tenant_name, domain, environment, endpoint, userdata, appendString, skip_tried, mysql_conf, output):
         self.tenant_name = tenant_name.rstrip().lower()
         self.domain = domain.rstrip().lower()
         self.safe_domain = self.domain.replace(".", "_")
@@ -106,6 +103,19 @@ class UrlChecker:
         self.mysql_user = None
         self.mysql_pass = None
         self.mysql_port = 3306
+        self.currentdir = os.getcwd()
+
+        if output:
+            self.output = True
+            # Check if the provided output path is absolute
+            if os.path.isabs(output):
+                # Use the absolute path as is
+                self.output_filename = output
+            else:
+                # Use the current directory and relative path
+                self.output_filename = os.path.join(self.currentdir, output)
+        else:
+            self.output = False
 
         if mysql_conf:
             self.mysql_enabled = True
@@ -392,9 +402,7 @@ class UrlChecker:
         url = f'https://{self.tenant_name}-my.{self.endpoint}/personal/{safeusername}_{self.safe_domain}/_layouts/15/onedrive.aspx'
         # Code to check the URL, handle request and process response
         if debug:
-            writeLock.acquire()
             print("Url is: %s" % url)
-            writeLock.release()
 
         requests.packages.urllib3.disable_warnings()
 
@@ -404,28 +412,22 @@ class UrlChecker:
             r = self.requests_retry_session().head(url, timeout=8.0)
             #print("Status code is: {}".format(r.status_code))
             status_code = str(r.status_code)
-            if status_code in ['404']:
+            if status_code in ['404', '301', '302']:
                 if verbose:
                     print(f'[-] [{status_code}] INVALID USERNAME FOR {self.tenant_name},{self.domain} - {username}, username:{username}@{self.domain}')
             elif status_code in ['401', '403']:
                 currenttime = str(int(time.time()))
                 self.validcount+=1
-                #You need to create a file for the output and then specify that file here
-                currentdir = os.getcwd()
-                output_filename = currentdir + '/' + self.domain + ".txt"
-                with lock:
-                    with open (output_filename, "a") as output_file:
-                        output_text = f'{username}@{self.domain}'
-                        output_file.write(output_text + '\n')
+
+                if self.output:
+                    with lock:
+                        with open (self.output_filename, "a") as output_file:
+                            output_text = f'{username}@{self.domain}'
+                            output_file.write(output_text + '\n')
+
                 print(f'[-] [{status_code}] VALID USERNAME FOR {self.tenant_name},{self.domain} - {username}, username:{username}@{self.domain}')
                 reconstructed_email = username.replace("_",".") + "@" + self.domain
                 self.sql_insert_user(reconstructed_email, username, self.domain,self.tenant_name,currenttime,self.environment)
-                pass
-            elif status_code in ['301', '302', '200']:
-                currenttime = str(int(time.time()))
-                print(f'[-] [{status_code}] Odd RESPONSE FOR {self.tenant_name},{self.domain} - {username}, username:{username}@{self.domain}')
-                if verbose:
-                    print("Account renamed")
                 pass
             else:
                 print(f'[?] [{status_code} UNKNOWN RESPONSE FOR {self.tenant_name},{self.domain} - {username}, username:{username}@{self.domain}')
@@ -794,20 +796,21 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("-d", "--domain", help="target domain name (required)", required=True, metavar='')
     parser.add_argument("-t", "--tenant", help="tenant name", metavar='')
+    parser.add_argument("-e", "--environment", help="Azure environment to target [commercial (default), chinese, gov]", metavar='')
     parser.add_argument("-u", "--username", help="user to target", metavar='')
-    parser.add_argument("-a", "--append", help="mutator: append a number, character, or string to a username", metavar='')
     parser.add_argument("-U", "--userfile", help="file containing usernames (wordlists) -- will also take a directory", metavar='')
     parser.add_argument("-p", "--playlist", help="file containing list of paths to user lists (wordlists) to try", metavar='')
+    parser.add_argument("-a", "--append", help="mutator: append a number, character, or string to a username", metavar='')
+    parser.add_argument("-tr", "--truncate", help="truncate to x characters", metavar='')
     parser.add_argument("-T", "--threads", help="total number of threads (defaut: 100)",default=100, metavar='')
-    parser.add_argument("-e", "--environment", help="Azure environment to target [commercial (default), chinese, gov]", metavar='')
     parser.add_argument("-r", "--rerun", help="force re-run of previously tested tenant/domain/wordlist combination", action='store_true')
     parser.add_argument("-x", "--skip-tried", help="dedupe. skip any usernames from previous runs", action='store_true', default=False)
     parser.add_argument("-n", "--no-db", help="disable logging to db", action='store_true', default=False)
+    parser.add_argument("-m", "--mysql", help="file containing mysql data (db.conf)", metavar='')
+    parser.add_argument("-o", "--output", help="file to append found users to", metavar='')
     parser.add_argument("-k", "--killafter", help="kill off non-productive jobs after x tries with no success", metavar='')
     parser.add_argument("-v", "--verbose", help="enable verbose output", action='store_true', default=False)
     parser.add_argument("-D", "--debug", help="enable debug output", action='store_true', default=False)
-    parser.add_argument("-tr", "--truncate", help="truncate to x characters", metavar='')
-    parser.add_argument("-m", "--mysql", help="file containing mysql data (db.conf)", metavar='')
 
     # read arguments from the command line
     args = parser.parse_args()
@@ -925,6 +928,11 @@ def main():
     else:
         appendString = ""
 
+    if args.output:
+        output = args.output
+    else:
+        output = False
+
     if args.environment:
         environment = args.environment.rstrip()
     else:
@@ -949,7 +957,7 @@ def main():
             print("We are checking on a username")
         userdata = username
         try:
-            url_checker = UrlChecker(tenantname, target_domain, environment, endpoint, userdata, appendString, skip_tried, mysql_conf)
+            url_checker = UrlChecker(tenantname, target_domain, environment, endpoint, userdata, appendString, skip_tried, mysql_conf, output)
             url_checker.check_user()
         except:
             if verbose:
@@ -997,7 +1005,7 @@ def main():
                         
                         userdata = tmp_truncated_users
 
-                    url_checker = UrlChecker(tenantname, target_domain, environment, endpoint, userdata, appendString, skip_tried, mysql_conf)
+                    url_checker = UrlChecker(tenantname, target_domain, environment, endpoint, userdata, appendString, skip_tried, mysql_conf, output)
                     if url_checker.tenant_exists:
                         url_checker.check_user_file()
                 except Exception as userfileerror:
@@ -1027,7 +1035,7 @@ def main():
                         #now add back in the original path so we have our full file path
                         safe_file_name = f'{userdata}{slash}{safe_file_name}'
                         print(f"Running with user list {i} of {len(file_list)} : {safe_file_name}")
-                        url_checker = UrlChecker(tenantname, target_domain, environment, endpoint, safe_file_name, appendString, skip_tried, mysql_conf)
+                        url_checker = UrlChecker(tenantname, target_domain, environment, endpoint, safe_file_name, appendString, skip_tried, mysql_conf, output)
                         if url_checker.tenant_exists:
                             url_checker.check_user_file()
                     except:
@@ -1059,7 +1067,7 @@ def main():
                         safe_file_name = currentfile.rstrip()
                         print(f"Running with user list {i} of {total_lines}: {currentfile}")
                         try:
-                            url_checker = UrlChecker(tenantname, target_domain, environment, endpoint, safe_file_name, appendString, skip_tried, mysql_conf)
+                            url_checker = UrlChecker(tenantname, target_domain, environment, endpoint, safe_file_name, appendString, skip_tried, mysql_conf, output)
                             if url_checker.tenant_exists:
                                 url_checker.check_user_file()
                         except:

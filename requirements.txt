@@ -1,3 +1,2 @@
 requests
-mysql-connector-python-rf
-Semaphore
+mysql-connector-python
