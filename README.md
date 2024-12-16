@@ -7,6 +7,7 @@ For a full rundown of the enumeration technique and OneDrive enum, check out the
 https://www.trustedsec.com/blog/onedrive-to-enum-them-all/
 
 
+If you are looking for the old, non-database vesion of OneDrive Enum, you can find it here: https://github.com/nyxgeek/simple_scanners
 
 
 ### New features in 2.10:
@@ -158,7 +159,8 @@ Beginning enumeration of https://microsoft-my.sharepoint.com/personal/USER_micro
 * https://github.com/Gerenios/AADInternals/
 * https://github.com/blacklanternsecurity/TREVORspray
 * https://github.com/nil0x42/duplicut
+* https://patorjk.com/ -- ascii art generator
 
 ## sHoUtOuTz aNd GrEeTz
 
-Thanks to @DrAzureAD, @thetechr0mancer, @rootsecdev, @HackingLZ
+Thanks to @DrAzureAD, @thetechr0mancer, @rootsecdev, @Oddvarmoe, @HackingLZ

@@ -1,2 +1,3 @@
+requests
 mysql-connector-python-rf
 Semaphore
