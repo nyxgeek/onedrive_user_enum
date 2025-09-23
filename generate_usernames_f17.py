@@ -808,7 +808,7 @@ class UsernameGenerator:
                         pattern_counts[pattern_dir] += count
                         completed += 1
                         if completed % 100 == 0:
-                            logger.info(f"Processed {completed}/{len(username_files)} files")
+                            logger.debug(f"Processed {completed}/{len(username_files)} files")
                     except Exception as e:
                         username_file = future_to_file[future]
                         logger.warning(f"Error processing {username_file}: {e}")
