@@ -479,13 +479,17 @@ class UrlChecker:
             self.checkTriedUsernames(self.userdata)
             #self.checkTriedUsernames(self.userdata, self.tenant_name, self.domain)
         else:
-            originalCount = subprocess.run(['wc', '-l', self.userdata], capture_output=True, text=True)
+            class _FakeResult: pass
+            originalCount = _FakeResult()
+            try:
+                with open(self.userdata) as _f: originalCount.stdout = str(len(_f.readlines())) + ' ' + self.userdata
+            except: originalCount.stdout = '0'
             self.totalcount = int((originalCount.stdout).split()[0])
 
-        if self.totalcount == 0:
-            self.status = "1337000003"
-            self.sql_log_completed_run(self.userdata)
-            exit()
+            if self.totalcount == 0:
+                self.status = "1337000003"
+                self.sql_log_completed_run(self.userdata)
+                exit()
 
 
         f = open(self.userdata)
@@ -556,12 +560,20 @@ class UrlChecker:
 
         if verbose:
             print("Sorting our incoming list...")
-        os.system(f'cat {userlist} | sort -u  > {tmp_incoming_users}')
+        # Windows patch: cat | sort -u
+        _lines = set()
+        _src = userlist if not isinstance(userlist, list) else userlist
+        if isinstance(_src, list):
+            for _fp in _src:
+                with open(_fp) as _f: _lines.update(l.strip() for l in _f if l.strip())
+        else:
+            with open(_src) as _f: _lines.update(l.strip() for l in _f if l.strip())
+        with open(tmp_incoming_users, 'w') as _f: _f.write('\n'.join(sorted(_lines)) + '\n')
         if verbose:
             print("Sort complete.")
 
-        originalCount = subprocess.run(['wc', '-l', tmp_incoming_users], capture_output=True, text=True)
-        oCountText = int((originalCount.stdout).split()[0])
+        with open(tmp_incoming_users) as _wc:
+            oCountText = sum(1 for line in _wc if line.strip())
         if oCountText == 0:
             print("Incoming file is empty. Exiting.")
             self.status = "1337000003"
@@ -591,14 +603,30 @@ class UrlChecker:
             return
 
         print("Creating a list of all usernames that have ever been attempted with this tenant/domain. This might take a minute... or 5. ")
-        os.system(f'cat {list_of_files} | sort -u  > {tmp_tried_users}')
+        # Windows patch
+        _tried = set()
+        if os.path.exists(list_of_files):
+            with open(list_of_files) as _lf:
+                for _fp in _lf:
+                    _fp = _fp.strip()
+                    if _fp and os.path.exists(_fp):
+                        with open(_fp) as _f: _tried.update(l.strip() for l in _f if l.strip())
+        with open(tmp_tried_users, 'w') as _f: _f.write('\n'.join(sorted(_tried)) + '\n')
         if verbose:
             print("List complete.")
 
-        os.system(f'comm -13 {tmp_tried_users} {tmp_incoming_users} > {tmp_untried_users}')
+        # Windows patch: comm -13
+        try:
+            with open(tmp_tried_users) as _f: _tried_set = set(l.strip() for l in _f if l.strip())
+        except: _tried_set = set()
+        try:
+            with open(tmp_incoming_users) as _f: _incoming_set = [l.strip() for l in _f if l.strip()]
+        except: _incoming_set = []
+        _untried = sorted(set(_incoming_set) - _tried_set)
+        with open(tmp_untried_users, 'w') as _f: _f.write('\n'.join(_untried) + '\n')
 
-        newCount = subprocess.run(['wc', '-l', tmp_untried_users], capture_output=True, text=True)
-        nCountText = int((newCount.stdout).split()[0])
+        with open(tmp_untried_users) as _wc:
+            nCountText = sum(1 for line in _wc if line.strip())
 
         #if verbose:
         print(f'We have reduced the count from {oCountText} to {nCountText}')
@@ -979,7 +1007,12 @@ def main():
                         if verbose:
                             print(f"Truncating file.")
                         try:
-                            truncate_cut = subprocess.run(['cut',f'-c1-{truncate}',userfile],check=True, capture_output=True)
+                            # Windows patch: cut -c1-N
+                            class _CutResult: pass
+                            truncate_cut = _CutResult()
+                            with open(userfile, 'rb') as _cf:
+                                _cut_lines = [l.rstrip(b'\n')[:int(truncate)] for l in _cf]
+                            truncate_cut.stdout = b'\n'.join(_cut_lines) + b'\n'
                         except:
                             print("XCouldn't cut the file")
 
@@ -989,7 +1022,11 @@ def main():
                             f_truncated = open(tmp_truncated_users, "w")
 
                             try:
-                                truncate_results = subprocess.run(['duplicut','-o',tmp_truncated_users],input = truncate_cut.stdout)
+                                # Windows patch: duplicut -> Python dedup
+                                _dedup_lines = sorted(set(truncate_cut.stdout.decode('utf-8','ignore').splitlines()))
+                                with open(tmp_truncated_users, 'w') as _df: _df.write('\n'.join(_dedup_lines) + '\n')
+                                class _DupResult: pass
+                                truncate_results = _DupResult()
                             except:
                                 if verbose:
                                     print("No duplicut - trying sort")
