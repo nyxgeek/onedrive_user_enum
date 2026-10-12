@@ -1,0 +1,15 @@
+[project]
+name = "onedrive-user-enum"
+version = "2.10.0"
+description = "Enumerate valid OneDrive users"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.9"
+dependencies = [
+    "requests",
+    "mysql-connector-python",
+]
+
+# Script-style project: onedrive_enum.py is run directly, not installed as a package.
+[tool.uv]
+package = false
