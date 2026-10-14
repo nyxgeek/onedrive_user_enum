@@ -73,7 +73,7 @@ options:
   -p , --playlist      file containing list of paths to user lists (wordlists) to try
   -a , --append        mutator: append a number, character, or string to a username
   -tr , --truncate     truncate to x characters
-  -T , --threads       total number of threads (defaut: 100)
+  -T , --threads       total number of threads (default: 50)
   -r, --rerun          force re-run of previously tested tenant/domain/wordlist combination
   -x, --skip-tried     dedupe. skip any usernames from previous runs
   -n, --no-db          disable logging to db
@@ -155,6 +155,15 @@ Beginning enumeration of https://microsoft-my.sharepoint.com/personal/USER_micro
 
 ```
 #### Note: Users that are valid but who have not yet signed into OneDrive will return a 404 not found.
+
+
+## Running tests:
+The tests run offline and stub the HTTP layer, so no traffic is sent to Microsoft.
+```
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt -r requirements-dev.txt
+.venv/bin/python -m pytest -q
+```
 
 
 ## references
