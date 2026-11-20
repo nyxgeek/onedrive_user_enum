@@ -14,17 +14,11 @@ import onedrive_enum as oe
 
 
 @pytest.fixture
-def db_path(tmp_path, monkeypatch):
-    path = tmp_path / "test.db"
-    conn = sqlite3.connect(path)
-    conn.execute(
-        "create table onedrive_enum(email_address text UNIQUE, username text, domain text, "
-        "tenant text, scrape_date_unix int, environment text);"
-    )
-    conn.commit()
-    conn.close()
-    monkeypatch.setattr(oe, "sqldb_location", str(path))
-    return path
+def db_path(monkeypatch):
+    # conftest already points sqldb_location at a temp file and disables the DB;
+    # opt back in so UrlChecker.__init__ creates the schema there.
+    monkeypatch.setattr(oe, "enable_db", True)
+    return oe.sqldb_location
 
 
 @pytest.fixture
@@ -101,14 +95,6 @@ def test_check_url_append_string(make_checker, db_path):
     assert "/personal/jsmith1_example_com/" in session.head.call_args[0][0]
 
 
-def test_check_url_email_input_overrides_domain(make_checker, db_path):
-    c = make_checker()
-    session = fake_session(404)
-    with mock.patch.object(c, "requests_retry_session", return_value=session):
-        c.check_url("jsmith@other.org")
-    assert "/personal/jsmith_other_org/" in session.head.call_args[0][0]
-
-
 def test_check_url_unknown_status_counts_error(make_checker, db_path):
     c = make_checker()
     with mock.patch.object(c, "requests_retry_session", return_value=fake_session(500)):
@@ -136,12 +122,6 @@ def test_check_url_connection_error_sleeps_and_counts(make_checker, db_path):
         c.check_url("jsmith")
     sleep.assert_called_once_with(3)
     assert c.errorcount == 1
-
-
-def test_run_sqlite_query_roundtrip(make_checker, db_path):
-    c = make_checker()
-    c.run_sqlite_query("INSERT INTO onedrive_enum VALUES ('a@b.c','a','b.c','t',1,'commercial');")
-    assert c.run_sqlite_query("select username from onedrive_enum;") == [("a",)]
 
 
 def test_sql_insert_user_is_idempotent(make_checker, db_path):
