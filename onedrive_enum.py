@@ -467,6 +467,7 @@ class UrlChecker:
             safeusername = safeusername.split("@")[0]
 
         safeusername = safeusername + self.appendString
+        username = username + self.appendString
 
         url = f'https://{self.tenant_name}-my.{self.endpoint}/personal/{safeusername}_{safe_domain}/_layouts/15/onedrive.aspx'
         # Code to check the URL, handle request and process response
@@ -495,7 +496,7 @@ class UrlChecker:
                             output_file.write(output_text + '\n')
 
                 print(f'[-] [{status_code}] VALID USERNAME FOR {self.tenant_name},{self.domain} - {username}, username:{username}@{self.domain}')
-                reconstructed_email = username.replace("_",".") + "@" + self.domain
+                reconstructed_email = username + "@" + self.domain
                 self.sql_insert_user(reconstructed_email, username, self.domain,self.tenant_name,currenttime,self.environment)
                 pass
             else:
