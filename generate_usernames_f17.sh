@@ -2,317 +2,114 @@
 # 2023.06.06 @nyxgeek
 # quick and dirty username generation from census data
 #
-# this will use approx 10GB of space and might take hours. HOURS. I tried to add output along the way.
-# Good luck.
+# Usage: ./generate_usernames_f17.sh firstnames.txt lastnames.txt
+#
+# Output goes to USERNAMES/tron_<pattern>/ as 175k-line chunks (xaaa, xaab, ...).
+# The full set is large (~10GB) so make sure you have the disk space.
+# Set SKIP_WAIT=1 to skip the 10 second abort window.
 
-echo "******************************************************************************************"
-echo " HEY! THIS IS GOING TO TAKE A LONG LONG TIME, AND WILL TAKE UP LIKE 10GB of DISK SPACE!!! "
-echo "******************************************************************************************"
-echo ""
-echo "******************************************************************************************"
-echo " HEY! THIS IS GOING TO TAKE A LONG LONG TIME, AND WILL TAKE UP LIKE 10GB of DISK SPACE!!! "
-echo "******************************************************************************************"
-echo ""
-echo "******************************************************************************************"
-echo " HEY! THIS IS GOING TO TAKE A LONG LONG TIME, AND WILL TAKE UP LIKE 10GB of DISK SPACE!!! "
-echo "******************************************************************************************"
-echo ""
-echo "******************************************************************************************"
-echo " HEY! THIS IS GOING TO TAKE A LONG LONG TIME, AND WILL TAKE UP LIKE 10GB of DISK SPACE!!! "
-echo "******************************************************************************************"
-echo ""
-echo "******************************************************************************************"
-echo " HEY! THIS IS GOING TO TAKE A LONG LONG TIME, AND WILL TAKE UP LIKE 10GB of DISK SPACE!!! "
-echo "******************************************************************************************"
-echo ""
-echo "******************************************************************************************"
-echo " HEY! THIS IS GOING TO TAKE A LONG LONG TIME, AND WILL TAKE UP LIKE 10GB of DISK SPACE!!! "
-echo "******************************************************************************************"
-echo ""
-echo "******************************************************************************************"
-echo " HEY! THIS IS GOING TO TAKE A LONG LONG TIME, AND WILL TAKE UP LIKE 10GB of DISK SPACE!!! "
-echo "******************************************************************************************"
-echo ""
-echo "******************************************************************************************"
-echo " HEY! THIS IS GOING TO TAKE A LONG LONG TIME, AND WILL TAKE UP LIKE 10GB of DISK SPACE!!! "
-echo "******************************************************************************************"
-echo ""
-echo "******************************************************************************************"
-echo " HEY! THIS IS GOING TO TAKE A LONG LONG TIME, AND WILL TAKE UP LIKE 10GB of DISK SPACE!!! "
-echo "******************************************************************************************"
-echo ""
-echo "******************************************************************************************"
-echo " HEY! THIS IS GOING TO TAKE A LONG LONG TIME, AND WILL TAKE UP LIKE 10GB of DISK SPACE!!! "
-echo "******************************************************************************************"
-echo ""
-echo "******************************************************************************************"
-echo " HEY! THIS IS GOING TO TAKE A LONG LONG TIME, AND WILL TAKE UP LIKE 10GB of DISK SPACE!!! "
-echo "******************************************************************************************"
-echo ""
-echo "(you still have time to CTRL-C for about 10 seconds)"
-if [[ -z $1 ||  -z $2 ]]; then
-	echo "You need to specify the first and last name files"
-    exit
+set -euo pipefail
+
+CHUNK_LINES=175000
+
+if [[ $# -lt 2 || ! -r $1 || ! -r $2 ]]; then
+	echo "Usage: $0 <firstnames-file> <lastnames-file>" >&2
+	exit 1
 fi
 
-sleep 10
+echo "******************************************************************************************"
+echo " HEY! THIS IS GOING TO TAKE UP LIKE 10GB of DISK SPACE!!!"
+echo "******************************************************************************************"
+
+if [[ -z ${SKIP_WAIT:-} ]]; then
+	echo "(you still have time to CTRL-C for about 10 seconds)"
+	sleep 10
+fi
 echo "Starting username generation..."
 
-FIRSTNAMES=$1
-LASTNAMES=$2
+OUTROOT="USERNAMES"
+WORKDIR=$(mktemp -d)
+trap 'rm -rf "${WORKDIR}"' EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
-CURRENTDIR=`pwd`
+# Normalize inputs: strip CRs, trim surrounding whitespace, drop blank lines,
+# de-duplicate (keeping order). The head-limited cross products therefore take
+# the first N *unique* names.
+clean() { tr -d '\r' < "$1" | awk '{gsub(/^[ \t]+|[ \t]+$/, "")} NF && !seen[$0]++'; }
+clean "$1" > "${WORKDIR}/first.all"
+clean "$2" > "${WORKDIR}/last.all"
+for f in first.all last.all; do
+	if [[ ! -s ${WORKDIR}/${f} ]]; then
+		echo "Error: ${f%.all} names file has no usable lines" >&2
+		exit 1
+	fi
+done
 
+# gen <dirname> <awk args...>
+# Runs awk and streams its output straight into split (no giant intermediate file).
+# Any existing chunks in the target directory are removed first so re-runs are idempotent.
+gen() {
+	local name=$1; shift
+	local dir="${OUTROOT}/tron_${name}"
+	mkdir -p "${dir}"
+	find "${dir}" -maxdepth 1 -type f \( -name 'x*' -o -name full.txt \) -delete
+	awk "$@" | split -a 3 -l "${CHUNK_LINES}" - "${dir}/x"
+}
 
-#generate jsmith
-echo "Generating jsmith"
-TMPPATH="USERNAMES/tron_jsmith_c1990"
-mkdir ${TMPPATH}
-time while read LASTNAME; do for letter in {a..z}; do echo "${letter}${LASTNAME}" >> ${TMPPATH}/full.txt; done; done < $2
-cd ${TMPPATH}
-split -l 175000 full.txt
-rm full.txt
-cd ${CURRENTDIR}
+# Prelude: L[0..25] = a..z
+LETTERS='BEGIN{for(i=0;i<26;i++)L[i]=sprintf("%c",97+i)}'
 
-#generate j.smith
-echo "Generating j.smith"
-TMPPATH="USERNAMES/tron_j.smith_c1990"
-mkdir ${TMPPATH} 2>/dev/null
-time while read LASTNAME; do for letter in {a..z}; do echo "${letter}.${LASTNAME}" >> ${TMPPATH}/full.txt; done; done < $2
-cd ${TMPPATH}
-split -l 175000 full.txt
-rm full.txt
-cd ${CURRENTDIR}
+# gen_letter <dirname> <input-file> <awk print expression using $0 and L[i]>
+gen_letter() {
+	local name=$1 file=$2 expr=$3
+	echo "Generating ${name}"
+	time gen "${name}" "${LETTERS} {for(i=0;i<26;i++) print ${expr}}" "${file}"
+}
 
+# gen_cross <dirname> <nfirst> <nlast> <awk print expression using f, m (and L[i] if letters=1)>
+# first names are the outer loop, last names the inner loop.
+gen_cross() {
+	local name=$1 nfirst=$2 nlast=$3 expr=$4
+	head -n "${nfirst}" "${WORKDIR}/first.all" > "${WORKDIR}/first.tmp"
+	head -n "${nlast}" "${WORKDIR}/last.all" > "${WORKDIR}/last.tmp"
+	echo "Generating ${name}"
+	time gen "${name}" "${LETTERS}
+		NR==FNR {l[++n]=\$0; next}
+		{f=\$0; for(j=1;j<=n;j++){m=l[j]; ${expr}}}" "${WORKDIR}/last.tmp" "${WORKDIR}/first.tmp"
+}
 
-#generate smithj
-echo "Generating smithj"
-TMPPATH="USERNAMES/tron_smithj_c1990"
-mkdir ${TMPPATH} 2>/dev/null
-time while read LASTNAME; do for letter in {a..z}; do echo "${LASTNAME}${letter}" >> ${TMPPATH}/full.txt; done; done < $2
-cd ${TMPPATH}
-split -l 175000 full.txt
-rm full.txt
-cd ${CURRENTDIR}
+LAST="${WORKDIR}/last.all"
+FIRST="${WORKDIR}/first.all"
 
-#generate smithja
+# last name + letter patterns
+gen_letter jsmith_c1990   "${LAST}" 'L[i] $0'
+gen_letter j.smith_c1990  "${LAST}" 'L[i] "." $0'
+gen_letter smithj_c1990   "${LAST}" '$0 L[i]'
+gen_letter smith.j_c1990  "${LAST}" '$0 "." L[i]'
+
 echo "Generating smithja Last/First/Middle"
-TMPPATH="USERNAMES/tron_smithja_c1990"
-mkdir ${TMPPATH} 2>/dev/null
-time while read LASTNAME; do for letter in {a..z};do for middle in {a..z};do echo "${LASTNAME}${letter}${middle}" >> ${TMPPATH}/full.txt; done; done; done < $2
-cd ${TMPPATH}
-split -l 175000 full.txt
-rm full.txt
-cd ${CURRENTDIR}
+time gen smithja_c1990 "${LETTERS} {for(i=0;i<26;i++) for(k=0;k<26;k++) print \$0 L[i] L[k]}" "${LAST}"
 
-#generate smith.j
-echo "Generating smith.j"
-TMPPATH="USERNAMES/tron_smith.j_c1990"
-mkdir ${TMPPATH}
-time while read LASTNAME; do for letter in {a..z}; do echo "${LASTNAME}.${letter}" >> ${TMPPATH}/full.txt; done; done < $2
-cd ${TMPPATH}
-split -l 175000 full.txt
-rm full.txt
-cd ${CURRENTDIR}
+# first name + letter patterns
+gen_letter johns_c1990   "${FIRST}" '$0 L[i]'
+gen_letter john.s_c1990  "${FIRST}" '$0 "." L[i]'
+gen_letter sjohn_c1990   "${FIRST}" 'L[i] $0'
+gen_letter s.john_c1990  "${FIRST}" 'L[i] "." $0'
 
+# first x last cross products (limited to ~10m lines each)
+gen_cross john.smith_500x20k   500  20000 'print f "." m'
+gen_cross john.smith_200x50k   200  50000 'print f "." m'
+gen_cross john.smith_1kx10k    1000 10000 'print f "." m'
+gen_cross johnsmith_1kx10k     1000 10000 'print f m'
+gen_cross smith.john_1kx10k    1000 10000 'print m "." f'
+gen_cross smithjohn_1kx10k     1000 10000 'print m f'
 
-#generate johns
-echo "Generating johns"
-TMPPATH="USERNAMES/tron_johns_c1990"
-mkdir ${TMPPATH} 2>/dev/null
-time while read FIRSTNAME; do for letter in {a..z}; do echo "${FIRSTNAME}${letter}" >> ${TMPPATH}/full.txt; done; done < $2
-cd ${TMPPATH}
-split -l 175000 full.txt
-rm full.txt
-cd ${CURRENTDIR}
+# john.j.smith: 300 first, 1750 last, all middle initials (~13.6m)
+gen_cross john.j.smith_300x1750 300 1750 'for(i=0;i<26;i++) print f "." L[i] "." m'
 
-
-#generate john.s
-echo "Generating johns"
-TMPPATH="USERNAMES/tron_john.s_c1990"
-mkdir ${TMPPATH} 2>/dev/null
-time while read FIRSTNAME; do for letter in {a..z}; do echo "${FIRSTNAME}.${letter}" >> ${TMPPATH}/full.txt; done; done < $2
-cd ${TMPPATH}
-split -l 175000 full.txt
-rm full.txt
-cd ${CURRENTDIR}
-
-
-#generate sjohn
-echo "Generating sjohn"
-TMPPATH="USERNAMES/tron_sjohn_c1990"
-mkdir ${TMPPATH} 2>/dev/null
-time while read FIRSTNAME; do for letter in {a..z}; do echo "${letter}${FIRSTNAME}" >> ${TMPPATH}/full.txt; done; done < $2
-cd ${TMPPATH}
-split -l 175000 full.txt
-rm full.txt
-cd ${CURRENTDIR}
-
-
-#generate s.john
-echo "Generating s.john"
-TMPPATH="USERNAMES/tron_s.john_c1990"
-mkdir ${TMPPATH} 2>/dev/null
-time while read FIRSTNAME; do for letter in {a..z}; do echo "${letter}.${FIRSTNAME}" >> ${TMPPATH}/full.txt; done; done < $2
-cd ${TMPPATH}
-split -l 175000 full.txt
-rm full.txt
-cd ${CURRENTDIR}
-
-
-#generate john.smith variations
-echo "Generating john.smith variations. This is gonna take FOREVER. Limiting total to 10m lines per variation."
-
-## VARIATION 1: 500 first names, 20k last names
-
-TMPPATH="USERNAMES/tron_john.smith_500x20k" 
-mkdir ${TMPPATH} 2>/dev/null
-
-TMPFIRSTNAME="/tmp/first.tmp"
-TMPLASTNAME="/tmp/last.tmp"
-
-cat "$1" | head -n 500 > ${TMPFIRSTNAME}
-cat "$2" | head -n 20000 > ${TMPLASTNAME}
-
-time while read FIRSTNAME; do while read LASTNAME; do echo "${FIRSTNAME}.${LASTNAME}" >> ${TMPPATH}/full.txt; done< ${TMPLASTNAME}; done <  ${TMPFIRSTNAME}
-cd ${TMPPATH}
-split -l 175000 full.txt
-rm full.txt
-cd ${CURRENTDIR}
-
-## VARIATION 2: 200 first names, 50k last names
-
-TMPPATH="USERNAMES/tron_john.smith_200x50k"
-mkdir ${TMPPATH} 2>/dev/null
-
-TMPFIRSTNAME="/tmp/first.tmp"
-TMPLASTNAME="/tmp/last.tmp"
-
-cat "$1" | head -n 200 > ${TMPFIRSTNAME}
-cat "$2" | head -n 50000 > ${TMPLASTNAME}
-
-time while read FIRSTNAME; do while read LASTNAME; do echo "${FIRSTNAME}.${LASTNAME}" >> ${TMPPATH}/full.txt; done< ${TMPLASTNAME}; done <  ${TMPFIRSTNAME}
-cd ${TMPPATH}
-split -l 175000 full.txt
-rm full.txt
-cd ${CURRENTDIR}
-
-
-
-## VARIATION 3: 1000 first names, 10k last names
-
-TMPPATH="USERNAMES/tron_john.smith_1kx10k"
-mkdir ${TMPPATH} 2>/dev/null
-
-TMPFIRSTNAME="/tmp/first.tmp"
-TMPLASTNAME="/tmp/last.tmp"
-
-cat "$1" | head -n 1000 > ${TMPFIRSTNAME}
-cat "$2" | head -n 10000 > ${TMPLASTNAME}
-
-time while read FIRSTNAME; do while read LASTNAME; do echo "${FIRSTNAME}.${LASTNAME}" >> ${TMPPATH}/full.txt; done< ${TMPLASTNAME}; done <  ${TMPFIRSTNAME}
-cd ${TMPPATH}
-split -l 175000 full.txt
-rm full.txt
-cd ${CURRENTDIR}
-
-
-
-
-#generate johnsmith variations
-echo "Generating johnsmith variations. This is gonna take FOREVER. Limiting total to 10m lines per variation."
-
-
-## VARIATION 1: 1k first names, 10k last names
-
-TMPPATH="USERNAMES/tron_johnsmith_1kx10k"
-mkdir ${TMPPATH} 2>/dev/null
-
-TMPFIRSTNAME="/tmp/first.tmp"
-TMPLASTNAME="/tmp/last.tmp"
-
-cat "$1" | head -n 1000 > ${TMPFIRSTNAME}
-cat "$2" | head -n 10000 > ${TMPLASTNAME}
-
-time while read FIRSTNAME; do while read LASTNAME; do echo "${FIRSTNAME}${LASTNAME}" >> ${TMPPATH}/full.txt; done< ${TMPLASTNAME}; done <  ${TMPFIRSTNAME}
-cd ${TMPPATH}
-split -l 175000 full.txt
-rm full.txt
-cd ${CURRENTDIR}
-
-
-
-#generate smith.john variations
-echo "Generating smith.john variations. This is gonna take FOREVER. Limiting total to 10m lines per variation."
-
-
-## VARIATION 1: 1k first names, 10k last names
-
-TMPPATH="USERNAMES/tron_smith.john_1kx10k"
-mkdir ${TMPPATH} 2>/dev/null
-
-TMPFIRSTNAME="/tmp/first.tmp"
-TMPLASTNAME="/tmp/last.tmp"
-
-cat "$1" | head -n 1000 > ${TMPFIRSTNAME}
-cat "$2" | head -n 10000 > ${TMPLASTNAME}
-
-time while read FIRSTNAME; do while read LASTNAME; do echo "${LASTNAME}.${FIRSTNAME}" >> ${TMPPATH}/full.txt; done< ${TMPLASTNAME}; done <  ${TMPFIRSTNAME}
-cd ${TMPPATH}
-split -l 175000 full.txt
-rm full.txt
-cd ${CURRENTDIR}
-
-
-
-#generate smithjohn variations
-echo "Generating smithjohn variations. This is gonna take FOREVER. Limiting total to 10m lines per variation."
-
-## VARIATION 1: 1k first names, 10k last names
-
-TMPPATH="USERNAMES/tron_smithjohn_1kx10k"
-mkdir ${TMPPATH} 2>/dev/null
-
-TMPFIRSTNAME="/tmp/first.tmp"
-TMPLASTNAME="/tmp/last.tmp"
-
-cat "$1" | head -n 1000 > ${TMPFIRSTNAME}
-cat "$2" | head -n 10000 > ${TMPLASTNAME}
-
-time while read FIRSTNAME; do while read LASTNAME; do echo "${LASTNAME}${FIRSTNAME}" >> ${TMPPATH}/full.txt; done< ${TMPLASTNAME}; done <  ${TMPFIRSTNAME}
-cd ${TMPPATH}
-split -l 175000 full.txt
-rm full.txt
-cd ${CURRENTDIR}
-
-
-#generate john.j.smith
-echo "Generating john.j.smith variations. This is gonna take FOREVER. Limiting total to 10m lines per variation."
-
-# VARIATION 1: 300 first, 750 last, all middle initials - 13m approx
-TMPPATH="USERNAMES/tron_john.j.smith_300x1750"
-mkdir ${TMPPATH} 2>/dev/null
-
-TMPFIRSTNAME="/tmp/first.tmp"
-TMPLASTNAME="/tmp/last.tmp"
-
-cat "$1" | head -n 300 > ${TMPFIRSTNAME}
-cat "$2" | head -n 1750 > ${TMPLASTNAME}
-
-time while read FIRSTNAME; do while read LASTNAME; do for letter in {a..z}; do  echo "${FIRSTNAME}.${letter}.${LASTNAME}" >> ${TMPPATH}/full.txt;done; done< ${TMPLASTNAME}; done <  ${TMPFIRSTNAME}
-cd ${TMPPATH}
-split -l 175000 full.txt
-rm full.txt
-cd ${CURRENTDIR}
-
-
-#generate jjs
-TMPPATH="USERNAMES/tron_jjs_all"
-mkdir ${TMPPATH} 2>/dev/null
-for letter1 in {a..z}; do for letter2 in {a..z}; do for letter3 in {a..z}; do echo "${letter1}${letter2}${letter3}" >> ${TMPPATH}/full.txt; done; done < $2
-cd ${TMPPATH}
-split -l 175000 full.txt
-rm full.txt
-cd ${CURRENTDIR}
+# jjs: every three-letter combination
+echo "Generating jjs"
+time gen jjs_all 'BEGIN{for(i=97;i<=122;i++)for(j=97;j<=122;j++)for(k=97;k<=122;k++)printf "%c%c%c\n",i,j,k}'
 
 echo "Done!"
