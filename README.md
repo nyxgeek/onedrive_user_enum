@@ -36,6 +36,17 @@ In this instance, the username is 'lightmand' and the domain is 'acmecomputercom
 The results may vary depending on how widely used OneDrive is within an org. Currently it is the most reliable user-enumeration method that I'm aware of (office365userenum no longer works, and the others like UhOh365 are unreliable). Further, it does not attempt a login and is much more passive, and should be undetectable to the target org. Microsoft will see the hits, but the target org won't.
 
 
+## install:
+Dependencies are managed with [uv](https://docs.astral.sh/uv/):
+
+```
+uv sync
+uv run onedrive_enum.py -h
+```
+
+`requirements.txt` is still provided for plain `pip install -r requirements.txt` users.
+
+
 ## usage:
 
 ```
