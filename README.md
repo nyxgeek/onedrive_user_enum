@@ -36,6 +36,17 @@ In this instance, the username is 'lightmand' and the domain is 'acmecomputercom
 The results may vary depending on how widely used OneDrive is within an org. Currently it is the most reliable user-enumeration method that I'm aware of (office365userenum no longer works, and the others like UhOh365 are unreliable). Further, it does not attempt a login and is much more passive, and should be undetectable to the target org. Microsoft will see the hits, but the target org won't.
 
 
+## install:
+Dependencies are managed with [uv](https://docs.astral.sh/uv/):
+
+```
+uv sync
+uv run onedrive_enum.py -h
+```
+
+`requirements.txt` is still provided for plain `pip install -r requirements.txt` users.
+
+
 ## usage:
 
 ```
@@ -73,7 +84,7 @@ options:
   -p , --playlist      file containing list of paths to user lists (wordlists) to try
   -a , --append        mutator: append a number, character, or string to a username
   -tr , --truncate     truncate to x characters
-  -T , --threads       total number of threads (defaut: 100)
+  -T , --threads       total number of threads (default: 50)
   -r, --rerun          force re-run of previously tested tenant/domain/wordlist combination
   -x, --skip-tried     dedupe. skip any usernames from previous runs
   -n, --no-db          disable logging to db
@@ -155,6 +166,15 @@ Beginning enumeration of https://microsoft-my.sharepoint.com/personal/USER_micro
 
 ```
 #### Note: Users that are valid but who have not yet signed into OneDrive will return a 404 not found.
+
+
+## Running tests:
+The tests run offline and stub the HTTP layer, so no traffic is sent to Microsoft.
+```
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt -r requirements-dev.txt
+.venv/bin/python -m pytest -q
+```
 
 
 ## references
